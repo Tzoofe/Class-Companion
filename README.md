@@ -69,6 +69,7 @@ Geolocation on a phone requires HTTPS — see [docs/PHONE_TESTING.md](docs/PHONE
 | GET | `/api/courses` | any | lecturer: own courses · student: courses listing their email |
 | POST | `/api/courses/preview` | lecturer | parse a roster file (multipart `file`) without saving |
 | POST | `/api/courses` | lecturer | create course (multipart `name`, `defaultRadiusM`, `file`) |
+| GET | `/api/courses/:id/students` | lecturer (own course) | roster with signup status, attendance count / %, last seen, present in active session |
 
 Authenticated requests send `Authorization: Bearer <token>`.
 
