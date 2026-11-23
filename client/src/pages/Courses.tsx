@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type LecturerCourse, type StudentCourse } from '../api';
 import { useAuth } from '../auth';
+import NotificationsCard from '../components/NotificationsCard';
 import { ErrorBox } from '../components/ui';
 
 export default function Courses() {
@@ -26,6 +27,7 @@ export default function Courses() {
           </Link>
         )}
       </div>
+      {!isLecturer && <NotificationsCard />}
       <ErrorBox>{error}</ErrorBox>
       {courses === null && !error && <p className="text-slate-500">טוען…</p>}
       {courses?.length === 0 && (

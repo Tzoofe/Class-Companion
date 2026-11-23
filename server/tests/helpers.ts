@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, inject } from 'vitest';
 import { createApp } from '../src/app';
 import { connectDb } from '../src/db';
 import { hashPassword } from '../src/lib/auth';
+import { settlePushes } from '../src/lib/push';
 import { User } from '../src/models/User';
 
 /** Connects to a fresh database (one per test file) and wipes it before each test. */
@@ -13,9 +14,11 @@ export function useTestDb() {
     await connectDb(inject('mongoUri'), dbName);
   });
   beforeEach(async () => {
+    await settlePushes(); // background notifications from the previous test
     await Promise.all(Object.values(mongoose.connection.collections).map((c) => c.deleteMany({})));
   });
   afterAll(async () => {
+    await settlePushes();
     await mongoose.connection.dropDatabase();
     await mongoose.disconnect();
   });

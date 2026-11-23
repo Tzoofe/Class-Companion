@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { ATTENDANCE_RULES, isPreciseEnoughToStart } from '../../../shared/attendance.js';
+import { announceSessionStarted } from '../lib/push.js';
 import { parseRosterFile } from '../lib/roster.js';
 import { closeExpiredSessions, toPublicSession, toStudentSession } from '../lib/sessions.js';
 import { readLocation } from '../lib/validate.js';
@@ -231,4 +232,5 @@ coursesRouter.post('/:id/sessions', requireRole('lecturer'), async (req, res) =>
     status: 'active',
   });
   res.status(201).json({ session: toPublicSession(session) });
+  announceSessionStarted({ id: course.id as string, name: course.name, roster: course.roster });
 });

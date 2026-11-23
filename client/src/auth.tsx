@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, tokenStore, type User } from './api';
+import { disablePush } from './push';
 
 interface AuthState {
   user: User | null;
@@ -36,6 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login: (e, p) => authenticate('/auth/login', e, p),
     signup: (e, p) => authenticate('/auth/signup', e, p),
     logout: () => {
+      // Stop notifications for this account on this device (best effort, needs the token, so before clearing it).
+      void disablePush().catch(() => {});
       tokenStore.set(null);
       setUser(null);
     },

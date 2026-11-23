@@ -78,13 +78,31 @@ Geolocation on a phone requires HTTPS — see [docs/PHONE_TESTING.md](docs/PHONE
 | GET | `/api/courses/:id/dashboard` | lecturer (own course) | counts, average attendance % and per-session history (finished sessions, last 12), live session count, up to 5 students under 70% |
 | GET | `/api/courses/:id/students` | lecturer (own course) | roster with signup status, attendance count / %, last seen, present in active session |
 | GET | `/api/courses/:id/sessions/active` | lecturer (own) / student (on roster) | the active session or `null` |
-| POST | `/api/courses/:id/sessions` | lecturer (own course) | start a session from `{ lat, lng, accuracy }`; 400 if accuracy > 100 m, 409 if one is active |
+| POST | `/api/courses/:id/sessions` | lecturer (own course) | start a session from `{ lat, lng, accuracy }`; 400 if accuracy > 100 m, 409 if one is active; notifies the course's students (push) |
 | GET | `/api/sessions/:id` | lecturer (own) | session + `checkedInCount` / `rosterCount` (polled every 3 s) |
 | POST | `/api/sessions/:id/close` | lecturer (own) | close early (`endsAt` = close time) |
 | POST | `/api/sessions/:id/range` | student (on roster) | `{ lat, lng, accuracy, timestamp }` → `{ inRange, distanceM, alreadyCheckedIn }`; no side effects |
 | POST | `/api/sessions/:id/check-in` | student (on roster) | re-validates range with a fresh reading (≤ 30 s) and records attendance once (409 if already) |
 
 Authenticated requests send `Authorization: Bearer <token>`.
+
+| GET | `/api/push/public-key` | public | VAPID public key for subscribing (`null` if push isn't configured) |
+| POST | `/api/push/subscribe` | any | save this device's push subscription (`PushSubscription.toJSON()`); endpoint must be a known push service |
+| POST | `/api/push/unsubscribe` | any | `{ endpoint }` — remove one of your own devices |
+| POST | `/api/push/test` | any | send a test notification to all of your devices |
+
+## Push notifications
+
+When a lecturer starts attendance, every signed-up student on the roster gets a notification
+("הנוכחות נפתחה · <course>") that opens the check-in page. Students turn it on from the course list.
+
+- Needs VAPID keys in `server/.env` (`npx web-push generate-vapid-keys`). Keep the same pair when moving
+  servers, or every device must subscribe again.
+- **iPhone:** iOS 16.4+, and only from the home-screen app (Safari → Share → Add to Home Screen). The app
+  is installed per address, so it must be served from a **fixed** HTTPS URL (Tailscale Funnel, see
+  [docs/PHONE_TESTING.md](docs/PHONE_TESTING.md)); a changing tunnel URL breaks installed apps.
+- Android Chrome and desktop browsers work without installing.
+- Expired subscriptions are removed automatically; logging out unsubscribes the device.
 
 ## Attendance rules
 

@@ -1,6 +1,7 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { authRouter } from './routes/auth.js';
 import { coursesRouter } from './routes/courses.js';
+import { pushRouter } from './routes/push.js';
 import { sessionsRouter } from './routes/sessions.js';
 
 export function createApp() {
@@ -13,6 +14,7 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/courses', coursesRouter);
   app.use('/api/sessions', sessionsRouter);
+  app.use('/api/push', pushRouter);
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found' });

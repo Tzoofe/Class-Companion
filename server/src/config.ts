@@ -15,6 +15,13 @@ export const config = {
   get jwtSecret() {
     return required('JWT_SECRET', 'test-secret');
   },
+  /** Web Push (VAPID) keys; null when not configured — notifications are then skipped. */
+  get vapid() {
+    const publicKey = process.env.VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY;
+    if (!publicKey || !privateKey) return null;
+    return { publicKey, privateKey, subject: process.env.VAPID_SUBJECT || 'mailto:noreply@example.com' };
+  },
   jwtExpiresIn: '7d',
   minPasswordLength: 6,
 };

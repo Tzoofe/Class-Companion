@@ -1,8 +1,37 @@
 # Testing on a phone
 
-Browsers only expose `navigator.geolocation` on secure (HTTPS) origins. A phone on the same Wi-Fi
-hitting `http://<your-mac-ip>:5173` will **not** get location. The fix is a Cloudflare quick tunnel,
-which gives the local dev server a public `https://….trycloudflare.com` URL — no account needed.
+Browsers only expose `navigator.geolocation` (and push notifications) on secure (HTTPS) origins. A
+phone on the same Wi-Fi hitting `http://<your-mac-ip>:5173` will **not** get location. The fix is a tunnel
+that gives the local dev server a public HTTPS URL.
+
+## Recommended: Tailscale Funnel (fixed URL)
+
+The home-screen app and its notification permission on iPhone are tied to the exact URL, so use a URL
+that never changes. Tailscale Funnel gives the Mac a permanent `https://<mac-name>.<tailnet>.ts.net`
+address (free account).
+
+One-time setup:
+1. `brew install --cask tailscale-app` (asks for your Mac password), open **Tailscale** and sign in.
+2. `tailscale funnel 5173` — the first time, it prints a link to enable HTTPS + Funnel for your tailnet;
+   open it, approve, and run the command again.
+
+Every time (with `npm run dev:server` and `npm run dev:client` running):
+
+```bash
+tailscale funnel --bg 5173     # stays on in the background, even after restarts
+tailscale funnel status        # shows the URL
+tailscale funnel --https=443 off   # stop sharing
+```
+
+Vite accepts `*.ts.net` hosts (`client/vite.config.ts → server.allowedHosts`).
+
+On the iPhone: open the URL in Safari → Share → **Add to Home Screen** → open the app from the home
+screen → log in (the home-screen app has its own login) → **הפעל התראות** on the course list → *Allow*.
+Use **שלח בדיקה** to confirm.
+
+## Alternative: Cloudflare quick tunnel (URL changes every run)
+
+Fine for location tests in the browser, **not** for the home-screen app or notifications.
 
 Only the Vite dev server (port 5173) is tunneled; it proxies `/api` to Express on port 3000, so one URL serves everything.
 
