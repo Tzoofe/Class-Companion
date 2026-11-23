@@ -54,18 +54,21 @@ Open `https://<tunnel>/debug/location` on the phone. The page shows:
 - best (lowest) accuracy seen so far
 - **Set as reference point** — stores the best reading; the page then shows live distance from it
 
-Accuracy color: green ≤ 30 m (precise enough to start a session), amber ≤ 100 m, red > 100 m (would be rejected).
+Accuracy color: green ≤ 30 m (precise), amber ≤ 100 m (still accepted for starting a session and checking in), red > 100 m (rejected).
 
 Suggested classroom test:
 1. Stand at the lecturer's desk, wait ~10–20 s for accuracy to settle, tap **Set as reference point**.
 2. Walk to the back row, the corners, the doorway and the hallway outside; note the distance and accuracy at each spot.
 3. Repeat with an iPhone and an Android phone, and with Wi-Fi on vs. off (Wi-Fi usually improves indoor accuracy).
 
-These numbers will guide the default radius (currently planned as 20 m) and the 30 m activation threshold.
+These numbers will guide the default radius (currently planned as 20 m) and the 100 m activation threshold.
 
 ## Testing phone-only screens on a laptop
 
-Attendance screens show a QR code on laptops. To use them on the laptop anyway:
+The lecturer's attendance screen works on a laptop too: it uses the browser's location, which a Mac
+derives from nearby Wi-Fi networks (no GPS), so accuracy is often worse than a phone's. Starting is
+allowed only once accuracy is within 100 m; otherwise open the page on a phone via the QR code under the
+button. The student check-in screen stays phone-only (QR code on laptops). To use it on a laptop anyway:
 
 1. Add `?forceMobile=1` to the URL (remembered for the tab; `?forceMobile=0` turns it off).
 2. Fake the location: Chrome DevTools → ⋮ → More tools → **Sensors** → Location → *Other…* and enter

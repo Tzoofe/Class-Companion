@@ -3,7 +3,7 @@ import { haversineM, type LatLng } from './geo';
 /** Attendance thresholds — single source for server validation and client UI. */
 export const ATTENDANCE_RULES = {
   /** Lecturer can start a session only with a reading at least this precise. */
-  lecturerMaxAccuracyM: 30,
+  lecturerMaxAccuracyM: 100,
   /** Student readings less precise than this are rejected outright. */
   studentMaxAccuracyM: 100,
   /** A check-in reading must be at most this old (|server now − reading time|). */

@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ATTENDANCE_RULES } from '../../../shared/attendance';
 import { api, ApiError, type LiveSession, type SessionStatus } from '../api';
-import PhoneOnly from '../components/PhoneOnly';
+import { OpenOnPhoneQr } from '../components/PhoneOnly';
 import { ErrorBox, primaryButton } from '../components/ui';
+import { isMobileDevice } from '../hooks/useIsMobile';
 import { useLocationWatch } from '../hooks/useLocationWatch';
 
 const POLL_MS = 3000;
@@ -14,6 +15,7 @@ function StartSession({ courseId, onStarted }: { courseId: string; onStarted: (s
   const { recentBest, count, error: geoError } = useLocationWatch(10_000);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [laptop] = useState(() => !isMobileDevice());
   const precise = recentBest !== null && recentBest.accuracy <= MAX_ACC;
 
   async function start() {
@@ -55,7 +57,9 @@ function StartSession({ courseId, onStarted }: { courseId: string; onStarted: (s
 
       {!precise && !geoError && (
         <p className="rounded-lg bg-slate-100 p-3 text-sm text-slate-700">
-          עמדו בתוך הכיתה, רצוי ליד שולחן המרצה. Wi-Fi דלוק משפר את הדיוק בתוך מבנים.
+          {laptop
+            ? 'למחשב נייד אין GPS: המיקום מחושב לפי רשתות Wi-Fi סביבכם ולכן לפעמים פחות מדויק. ודאו שה-Wi-Fi דלוק ושהדפדפן מורשה לגשת למיקום (הגדרות המערכת ← פרטיות ואבטחה ← שירותי מיקום).'
+            : 'עמדו בתוך הכיתה, רצוי ליד שולחן המרצה. Wi-Fi דלוק משפר את הדיוק בתוך מבנים.'}
         </p>
       )}
       <ErrorBox>{geoError || error}</ErrorBox>
@@ -66,6 +70,15 @@ function StartSession({ courseId, onStarted }: { courseId: string; onStarted: (s
       <p className="text-xs text-slate-500">
         המפגש יימשך {ATTENDANCE_RULES.defaultSessionMinutes} דקות, וניתן לסגור אותו מוקדם יותר.
       </p>
+
+      {laptop && (
+        <details className="rounded-xl bg-white p-4 text-start shadow-sm ring-1 ring-slate-200" open={!!geoError}>
+          <summary className="cursor-pointer text-sm font-medium text-slate-700">המיקום במחשב לא מדויק? פתחו את הדף בטלפון</summary>
+          <div className="mt-3 text-center">
+            <OpenOnPhoneQr />
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -175,12 +188,10 @@ export default function LecturerAttendance() {
       <Link to={`/courses/${id}`} className="text-sm text-slate-500 hover:underline">
         → חזרה לקורס
       </Link>
-      <PhoneOnly>
-        <ErrorBox>{error}</ErrorBox>
-        {sessionId === undefined && !error && <p className="text-center text-slate-500">טוען…</p>}
-        {sessionId === null && <StartSession courseId={id} onStarted={(s) => setSessionId(s.id)} />}
-        {sessionId && <LiveView sessionId={sessionId} />}
-      </PhoneOnly>
+      <ErrorBox>{error}</ErrorBox>
+      {sessionId === undefined && !error && <p className="text-center text-slate-500">טוען…</p>}
+      {sessionId === null && <StartSession courseId={id} onStarted={(s) => setSessionId(s.id)} />}
+      {sessionId && <LiveView sessionId={sessionId} />}
     </div>
   );
 }

@@ -12,7 +12,7 @@ import { haversineM } from '../../shared/geo';
 describe('ATTENDANCE_RULES', () => {
   it('matches the agreed thresholds', () => {
     expect(R).toMatchObject({
-      lecturerMaxAccuracyM: 30,
+      lecturerMaxAccuracyM: 100,
       studentMaxAccuracyM: 100,
       readingMaxAgeMs: 30_000,
       defaultSessionMinutes: 15,
@@ -82,9 +82,9 @@ describe('isFresh', () => {
 });
 
 describe('accuracy gates', () => {
-  it('lecturer may start only at ≤ 30 m', () => {
-    expect(isPreciseEnoughToStart(30)).toBe(true);
-    expect(isPreciseEnoughToStart(30.1)).toBe(false);
+  it('lecturer may start only at ≤ 100 m', () => {
+    expect(isPreciseEnoughToStart(100)).toBe(true);
+    expect(isPreciseEnoughToStart(100.1)).toBe(false);
   });
   it('student readings are accepted only at ≤ 100 m', () => {
     expect(isPreciseEnoughToCheckIn(100)).toBe(true);

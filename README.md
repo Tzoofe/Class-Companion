@@ -76,7 +76,7 @@ Geolocation on a phone requires HTTPS — see [docs/PHONE_TESTING.md](docs/PHONE
 | POST | `/api/courses` | lecturer | create course `{ name, defaultRadiusM, fileName, fileBase64 }` |
 | GET | `/api/courses/:id/students` | lecturer (own course) | roster with signup status, attendance count / %, last seen, present in active session |
 | GET | `/api/courses/:id/sessions/active` | lecturer (own) / student (on roster) | the active session or `null` |
-| POST | `/api/courses/:id/sessions` | lecturer (own course) | start a session from `{ lat, lng, accuracy }`; 400 if accuracy > 30 m, 409 if one is active |
+| POST | `/api/courses/:id/sessions` | lecturer (own course) | start a session from `{ lat, lng, accuracy }`; 400 if accuracy > 100 m, 409 if one is active |
 | GET | `/api/sessions/:id` | lecturer (own) | session + `checkedInCount` / `rosterCount` (polled every 3 s) |
 | POST | `/api/sessions/:id/close` | lecturer (own) | close early (`endsAt` = close time) |
 | POST | `/api/sessions/:id/range` | student (on roster) | `{ lat, lng, accuracy, timestamp }` → `{ inRange, distanceM, alreadyCheckedIn }`; no side effects |
@@ -91,7 +91,9 @@ Defined once in `shared/attendance.ts` and used by both server and client:
 - **In range** ⇔ `distance(student, center) − studentAccuracy − centerAccuracy ≤ radius`
   (Haversine distance in a pure, unit-tested function; `$geoNear` was not used because the rule needs both
   accuracy circles, and only one point is ever compared against one center).
-- Lecturer can start a session only with accuracy ≤ 30 m; student readings > 100 m are rejected.
+- Lecturer can start a session only with accuracy ≤ 100 m (laptops have no GPS, so their Wi-Fi-based
+  estimate is often 40–100 m); student readings > 100 m are rejected. The start point's accuracy is added
+  to the radius when checking students, so a less precise start makes the check more lenient.
 - A session lasts 15 minutes (radius from the course, default 20 m) and auto-closes at `endsAt` the next time it is read.
 - Only one active session per course.
 - Students never receive the session center; the server computes distance and range.

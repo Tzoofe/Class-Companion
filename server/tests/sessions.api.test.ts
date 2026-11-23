@@ -38,13 +38,13 @@ describe('POST /api/courses/:id/sessions', () => {
     expect(saved?.center.coordinates).toEqual([34.8, 32.1]); // GeoJSON order: [lng, lat]
   });
 
-  it('blocks start when accuracy is worse than 30 m', async () => {
+  it('blocks start when accuracy is worse than 100 m', async () => {
     const { start } = await setup();
-    expect((await start({ ...HERE, accuracy: 30 })).status).toBe(201);
+    expect((await start({ ...HERE, accuracy: 100 })).status).toBe(201);
     await Session.deleteMany({});
-    const res = await start({ ...HERE, accuracy: 30.5 });
+    const res = await start({ ...HERE, accuracy: 100.5 });
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: 'Location not precise enough', maxAccuracyM: 30 });
+    expect(res.body).toEqual({ error: 'Location not precise enough', maxAccuracyM: 100 });
   });
 
   it('rejects malformed locations', async () => {

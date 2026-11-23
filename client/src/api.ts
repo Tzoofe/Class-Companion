@@ -34,7 +34,7 @@ const HEBREW_ERRORS: Record<string, string> = {
   'Course not found': 'הקורס לא נמצא',
   'Session not found': 'המפגש לא נמצא',
   'Invalid location': 'מיקום לא תקין',
-  'Location not precise enough': 'המיקום לא מדויק מספיק — המתינו לדיוק של עד 30 מ׳',
+  'Location not precise enough': 'המיקום לא מדויק מספיק — המתינו לדיוק של עד 100 מ׳',
   'Location too imprecise': 'המיקום לא מדויק מספיק — הפעילו "מיקום מדויק" עבור Safari/Chrome בהגדרות',
   'Location reading too old': 'קריאת המיקום ישנה מדי — נסו שוב',
   'Not in range': 'נראה שאינך בטווח הכיתה',
