@@ -109,7 +109,7 @@ describe('GET /api/sessions/:id and POST /api/sessions/:id/close', () => {
     const { auth, start } = await setup();
     const { body } = await start();
     const dana = await User.create({ email: 'dana@uni.ac.il', passwordHash: 'x', role: 'student' });
-    await Attendance.create({ sessionId: body.session.id, studentId: dana._id, source: 'gps', distanceM: 4, accuracyM: 8 });
+    await Attendance.create({ sessionId: body.session.id, email: 'dana@uni.ac.il', studentId: dana._id, source: 'gps', distanceM: 4, accuracyM: 8 });
     const res = await api().get(`/api/sessions/${body.session.id}`).set(auth);
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ checkedInCount: 1, rosterCount: 2, session: { status: 'active', courseName: 'C' } });

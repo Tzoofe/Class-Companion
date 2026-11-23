@@ -47,10 +47,10 @@ describe('GET /api/courses/:id/students', () => {
     const past2 = await makeSession(course._id, 'closed', -60);
     const live = await makeSession(course._id, 'active', 10);
     await Attendance.create([
-      { sessionId: past1._id, studentId: dana._id, source: 'gps', distanceM: 5, accuracyM: 8 },
-      { sessionId: past2._id, studentId: dana._id, source: 'manual' },
-      { sessionId: live._id, studentId: dana._id, source: 'gps', distanceM: 3, accuracyM: 6 },
-      { sessionId: past1._id, studentId: ron._id, source: 'gps', distanceM: 9, accuracyM: 12 },
+      { sessionId: past1._id, email: 'dana@uni.ac.il', studentId: dana._id, source: 'gps', distanceM: 5, accuracyM: 8 },
+      { sessionId: past2._id, email: 'dana@uni.ac.il', studentId: dana._id, source: 'manual' },
+      { sessionId: live._id, email: 'dana@uni.ac.il', studentId: dana._id, source: 'gps', distanceM: 3, accuracyM: 6 },
+      { sessionId: past1._id, email: 'ron@uni.ac.il', studentId: ron._id, source: 'gps', distanceM: 9, accuracyM: 12 },
     ]);
     const res = await get();
     expect(res.body.course).toMatchObject({ sessionCount: 3, activeSessionId: live.id });
@@ -65,7 +65,7 @@ describe('GET /api/courses/:id/students', () => {
     const { course, dana, get } = await setup();
     const other = await Course.create({ name: 'Other', lecturerId: course.lecturerId });
     const s = await makeSession(other._id, 'closed', -60);
-    await Attendance.create({ sessionId: s._id, studentId: dana._id, source: 'gps' });
+    await Attendance.create({ sessionId: s._id, email: 'dana@uni.ac.il', studentId: dana._id, source: 'gps' });
     const res = await get();
     expect(res.body.students.every((r: { attended: number }) => r.attended === 0)).toBe(true);
   });
@@ -96,10 +96,10 @@ describe('GET /api/courses/:id/dashboard', () => {
     const past2 = await makeSession(course._id, 'closed', -60);
     const live = await makeSession(course._id, 'active', 10);
     await Attendance.create([
-      { sessionId: past1._id, studentId: dana._id, source: 'manual' },
-      { sessionId: past2._id, studentId: dana._id, source: 'manual' },
-      { sessionId: past1._id, studentId: ron._id, source: 'manual' },
-      { sessionId: live._id, studentId: ron._id, source: 'manual' },
+      { sessionId: past1._id, email: 'dana@uni.ac.il', studentId: dana._id, source: 'manual' },
+      { sessionId: past2._id, email: 'dana@uni.ac.il', studentId: dana._id, source: 'manual' },
+      { sessionId: past1._id, email: 'ron@uni.ac.il', studentId: ron._id, source: 'manual' },
+      { sessionId: live._id, email: 'ron@uni.ac.il', studentId: ron._id, source: 'manual' },
     ]);
     const res = await dashboard(course.id, await loginToken('lect@uni.ac.il'));
     expect(res.status).toBe(200);

@@ -2,7 +2,8 @@ export interface StatsInput {
   roster: { email: string; firstName: string; lastName: string }[];
   users: { id: string; email: string }[];
   sessions: { id: string; status: string; endsAt: Date }[];
-  attendance: { sessionId: string; studentId: string; checkedInAt: Date }[];
+  /** Present records only, keyed by roster email. */
+  attendance: { sessionId: string; email: string; checkedInAt: Date }[];
   now: Date;
 }
 
@@ -33,24 +34,24 @@ export function buildStudentRows({ roster, users, sessions, attendance, now }: S
   const byStudent = new Map<string, { count: number; last: Date | null; inActive: boolean }>();
   for (const a of attendance) {
     if (!sessionIds.has(a.sessionId)) continue;
-    const s = byStudent.get(a.studentId) ?? { count: 0, last: null, inActive: false };
+    const key = a.email.toLowerCase();
+    const s = byStudent.get(key) ?? { count: 0, last: null, inActive: false };
     s.count++;
     if (!s.last || a.checkedInAt > s.last) s.last = a.checkedInAt;
     if (a.sessionId === activeId) s.inActive = true;
-    byStudent.set(a.studentId, s);
+    byStudent.set(key, s);
   }
 
   const total = sessions.length;
   const collator = new Intl.Collator('he');
   return roster
     .map((r) => {
-      const userId = userIdByEmail.get(r.email.toLowerCase());
-      const s = (userId && byStudent.get(userId)) || { count: 0, last: null, inActive: false };
+      const s = byStudent.get(r.email.toLowerCase()) ?? { count: 0, last: null, inActive: false };
       return {
         email: r.email,
         firstName: r.firstName,
         lastName: r.lastName,
-        registered: userId !== undefined,
+        registered: userIdByEmail.has(r.email.toLowerCase()),
         attended: s.count,
         totalSessions: total,
         percent: total === 0 ? null : Math.round((s.count / total) * 100),
@@ -65,7 +66,8 @@ export interface DashboardInput {
   roster: { email: string; firstName: string; lastName: string }[];
   users: { id: string; email: string }[];
   sessions: { id: string; status: string; startsAt: Date; endsAt: Date }[];
-  attendance: { sessionId: string; studentId: string }[];
+  /** Present records only, keyed by roster email. */
+  attendance: { sessionId: string; email: string }[];
   now: Date;
 }
 
@@ -94,7 +96,8 @@ export function buildDashboard({ roster, users, sessions, attendance, now }: Das
   const attendedByStudent = new Map<string, number>();
   for (const a of attendance) {
     presentBySession.set(a.sessionId, (presentBySession.get(a.sessionId) ?? 0) + 1);
-    if (finishedIds.has(a.sessionId)) attendedByStudent.set(a.studentId, (attendedByStudent.get(a.studentId) ?? 0) + 1);
+    const key = a.email.toLowerCase();
+    if (finishedIds.has(a.sessionId)) attendedByStudent.set(key, (attendedByStudent.get(key) ?? 0) + 1);
   }
 
   const pct = (part: number, whole: number) => (whole === 0 ? null : Math.round((part / whole) * 100));
@@ -106,8 +109,7 @@ export function buildDashboard({ roster, users, sessions, attendance, now }: Das
       ? []
       : roster
           .map((r) => {
-            const userId = userIdByEmail.get(r.email.toLowerCase());
-            const attended = (userId && attendedByStudent.get(userId)) || 0;
+            const attended = attendedByStudent.get(r.email.toLowerCase()) ?? 0;
             return { email: r.email, firstName: r.firstName, lastName: r.lastName, attended, percent: pct(attended, finished.length)! };
           })
           .filter((s) => s.percent < DASHBOARD.atRiskPercent)

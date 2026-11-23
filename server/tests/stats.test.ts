@@ -53,9 +53,9 @@ describe('buildStudentRows', () => {
       { id: 's3', status: 'closed', endsAt: t('21T12:15:00') },
     ];
     const attendance = [
-      { sessionId: 's1', studentId: 'u-dana', checkedInAt: t('20T10:02:00') },
-      { sessionId: 's2', studentId: 'u-dana', checkedInAt: t('21T10:03:00') },
-      { sessionId: 's3', studentId: 'u-ron', checkedInAt: t('21T12:01:00') },
+      { sessionId: 's1', email: 'dana@x.com', checkedInAt: t('20T10:02:00') },
+      { sessionId: 's2', email: 'dana@x.com', checkedInAt: t('21T10:03:00') },
+      { sessionId: 's3', email: 'ron@x.com', checkedInAt: t('21T12:01:00') },
     ];
     const rows = buildStudentRows(input({ sessions, attendance }));
     const dana = rows.find((r) => r.email === 'dana@x.com')!;
@@ -67,8 +67,8 @@ describe('buildStudentRows', () => {
   it('ignores attendance of users no longer on the roster and of other sessions', () => {
     const sessions = [{ id: 's1', status: 'closed', endsAt: t('20T10:15:00') }];
     const attendance = [
-      { sessionId: 's1', studentId: 'u-gone', checkedInAt: t('20T10:02:00') },
-      { sessionId: 'other-course-session', studentId: 'u-dana', checkedInAt: t('20T10:02:00') },
+      { sessionId: 's1', email: 'gone@x.com', checkedInAt: t('20T10:02:00') },
+      { sessionId: 'other-course-session', email: 'dana@x.com', checkedInAt: t('20T10:02:00') },
     ];
     const rows = buildStudentRows(input({ sessions, attendance }));
     expect(rows).toHaveLength(4);
@@ -76,7 +76,7 @@ describe('buildStudentRows', () => {
   });
 
   it('presentNow is set only while a session is active', () => {
-    const attendance = [{ sessionId: 's-live', studentId: 'u-dana', checkedInAt: t('22T09:58:00') }];
+    const attendance = [{ sessionId: 's-live', email: 'dana@x.com', checkedInAt: t('22T09:58:00') }];
     const live = [{ id: 's-live', status: 'active', endsAt: t('22T10:10:00') }];
     const rows = buildStudentRows(input({ sessions: live, attendance }));
     expect(rows.find((r) => r.email === 'dana@x.com')?.presentNow).toBe(true);

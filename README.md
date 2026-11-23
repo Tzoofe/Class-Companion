@@ -77,10 +77,13 @@ Geolocation on a phone requires HTTPS — see [docs/PHONE_TESTING.md](docs/PHONE
 | POST | `/api/courses` | lecturer | create course `{ name, defaultRadiusM, fileName, fileBase64 }` |
 | GET | `/api/courses/:id/dashboard` | lecturer (own course) | counts, average attendance % and per-session history (finished sessions, last 12), live session count, up to 5 students under 70% |
 | GET | `/api/courses/:id/students` | lecturer (own course) | roster with signup status, attendance count / %, last seen, present in active session |
+| GET | `/api/courses/:id/sessions` | lecturer (own course) | all sessions, newest first, with present counts |
 | GET | `/api/courses/:id/sessions/active` | lecturer (own) / student (on roster) | the active session or `null` |
 | POST | `/api/courses/:id/sessions` | lecturer (own course) | start a session from `{ lat, lng, accuracy }`; 400 if accuracy > 100 m, 409 if one is active; notifies the course's students (push) |
 | GET | `/api/sessions/:id` | lecturer (own) | session + `checkedInCount` / `rosterCount` (polled every 3 s) |
 | POST | `/api/sessions/:id/close` | lecturer (own) | close early (`endsAt` = close time) |
+| GET | `/api/sessions/:id/roster` | lecturer (own) | session summary + every roster student: present, source (`gps` / `manual`), check-in time, distance |
+| PUT | `/api/sessions/:id/attendance` | lecturer (own) | `{ email, present }` — mark a roster student present/absent, live or after the session |
 | POST | `/api/sessions/:id/range` | student (on roster) | `{ lat, lng, accuracy, timestamp }` → `{ inRange, distanceM, alreadyCheckedIn }`; no side effects |
 | POST | `/api/sessions/:id/check-in` | student (on roster) | re-validates range with a fresh reading (≤ 30 s) and records attendance once (409 if already) |
 
@@ -105,6 +108,11 @@ When a lecturer starts attendance, every signed-up student on the roster gets a 
 - Expired subscriptions are removed automatically; logging out unsubscribes the device.
 
 ## Attendance rules
+
+- Attendance is stored per **roster email**, so the lecturer can mark students who never signed up; it
+  counts for them once they do.
+- The lecturer can mark anyone present or absent (live screen or *מפגשים* page), including overriding a GPS
+  check-in. A student marked absent can't check in to that session by GPS.
 
 Defined once in `shared/attendance.ts` and used by both server and client:
 

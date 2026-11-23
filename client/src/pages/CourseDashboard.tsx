@@ -33,7 +33,7 @@ function Card({ title, action, children }: { title: string; action?: ReactNode; 
 }
 
 /** Present-per-session bars (one series, so no legend). Hover/focus a bar for its exact numbers. */
-function AttendanceChart({ history, rosterCount }: { history: Dashboard['history']; rosterCount: number }) {
+function AttendanceChart({ courseId, history, rosterCount }: { courseId: string; history: Dashboard['history']; rosterCount: number }) {
   if (history.length === 0) return <p className="py-6 text-center text-sm text-slate-500">עוד לא התקיימו מפגשים.</p>;
   const max = Math.max(rosterCount, 1);
   const first = history[0];
@@ -54,18 +54,24 @@ function AttendanceChart({ history, rosterCount }: { history: Dashboard['history
           const pct = Math.round((s.present / max) * 100);
           const label = `${longDate(s.startsAt)}: ${s.present}/${rosterCount} (${pct}%)`;
           return (
-            <div key={s.id} role="listitem" tabIndex={0} aria-label={label} className="group relative flex h-full flex-1 items-end outline-none">
+            <Link
+              key={s.id}
+              to={`/courses/${courseId}/sessions/${s.id}`}
+              role="listitem"
+              aria-label={label}
+              className="group relative flex h-full flex-1 items-end outline-none"
+            >
               <div
-                className="w-full rounded-t-[4px] bg-indigo-500 transition-colors group-hover:bg-indigo-700 group-focus:bg-indigo-700"
+                className="w-full rounded-t-[4px] bg-indigo-500 transition-colors group-hover:bg-indigo-700 group-focus-visible:bg-indigo-700"
                 style={{ height: `${Math.max(pct, s.present > 0 ? 2 : 0)}%` }}
               />
-              <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1 text-xs text-white shadow group-hover:block group-focus:block">
+              <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1 text-xs text-white shadow group-hover:block group-focus-visible:block">
                 <div>{longDate(s.startsAt)}</div>
                 <div className="font-semibold tabular-nums">
                   {s.present}/{rosterCount} · {pct}%
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
@@ -156,8 +162,20 @@ export default function CourseDashboard() {
         />
       </div>
 
-      <Card title="נוכחות לפי מפגש" action={data.finishedSessionCount > data.history.length && <span className="text-xs text-slate-500">{data.history.length} המפגשים האחרונים</span>}>
-        <AttendanceChart history={data.history} rosterCount={rosterCount} />
+      <Card
+        title="נוכחות לפי מפגש"
+        action={
+          data.sessionCount > 0 && (
+            <Link to={`/courses/${course.id}/sessions`} className="text-sm text-indigo-700 hover:underline">
+              כל המפגשים ←
+            </Link>
+          )
+        }
+      >
+        <AttendanceChart courseId={course.id} history={data.history} rosterCount={rosterCount} />
+        {data.finishedSessionCount > data.history.length && (
+          <p className="mt-1 text-xs text-slate-500">מוצגים {data.history.length} המפגשים האחרונים. לחצו על עמודה כדי לראות ולתקן את הנוכחות.</p>
+        )}
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">

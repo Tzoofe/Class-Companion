@@ -17,7 +17,7 @@ const users = [
 ];
 const closed = (id: string, day: number) => ({ id, status: 'closed', startsAt: at(day), endsAt: at(day, 9) });
 const input = (over: Partial<DashboardInput> = {}): DashboardInput => ({ roster, users, sessions: [], attendance: [], now: NOW, ...over });
-const att = (sessionId: string, ...students: string[]) => students.map((studentId) => ({ sessionId, studentId }));
+const att = (sessionId: string, ...students: string[]) => students.map((s) => ({ sessionId, email: `${s.slice(2)}@x.com` })); // 'u-dana' → dana@x.com
 
 describe('buildDashboard', () => {
   it('handles a course with no sessions', () => {

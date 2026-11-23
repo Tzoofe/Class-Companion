@@ -7,7 +7,7 @@ import { closeExpiredSessions, toPublicSession, toStudentSession } from '../lib/
 import { readLocation } from '../lib/validate.js';
 import { buildDashboard, buildStudentRows, isSessionActive } from '../lib/stats.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { Attendance } from '../models/Attendance.js';
+import { Attendance, PRESENT } from '../models/Attendance.js';
 import { Course } from '../models/Course.js';
 import { Session } from '../models/Session.js';
 import { User } from '../models/User.js';
@@ -115,15 +115,15 @@ coursesRouter.get('/:id/students', requireRole('lecturer'), async (req, res) => 
     Session.find({ courseId: course._id }, { status: 1, endsAt: 1 }),
   ]);
   const attendance = await Attendance.find(
-    { sessionId: { $in: sessions.map((s) => s._id) } },
-    { sessionId: 1, studentId: 1, checkedInAt: 1 },
+    { sessionId: { $in: sessions.map((s) => s._id) }, ...PRESENT },
+    { sessionId: 1, email: 1, checkedInAt: 1 },
   );
   const now = new Date();
   const students = buildStudentRows({
     roster: course.roster.map((r) => ({ email: r.email, firstName: r.firstName, lastName: r.lastName })),
     users: users.map((u) => ({ id: u.id as string, email: u.email })),
     sessions: sessions.map((s) => ({ id: s.id as string, status: s.status, endsAt: s.endsAt })),
-    attendance: attendance.map((a) => ({ sessionId: String(a.sessionId), studentId: String(a.studentId), checkedInAt: a.checkedInAt })),
+    attendance: attendance.map((a) => ({ sessionId: String(a.sessionId), email: a.email, checkedInAt: a.checkedInAt })),
     now,
   });
   const active = sessions.find((s) => isSessionActive(s, now));
@@ -154,15 +154,36 @@ coursesRouter.get('/:id/dashboard', requireRole('lecturer'), async (req, res) =>
     User.find({ email: { $in: emails } }, { email: 1 }),
     Session.find({ courseId: course._id }, { status: 1, startsAt: 1, endsAt: 1 }),
   ]);
-  const attendance = await Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) } }, { sessionId: 1, studentId: 1 });
+  const attendance = await Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) }, ...PRESENT }, { sessionId: 1, email: 1 });
   const dashboard = buildDashboard({
     roster: course.roster.map((r) => ({ email: r.email, firstName: r.firstName, lastName: r.lastName })),
     users: users.map((u) => ({ id: u.id as string, email: u.email })),
     sessions: sessions.map((s) => ({ id: s.id as string, status: s.status, startsAt: s.startsAt, endsAt: s.endsAt })),
-    attendance: attendance.map((a) => ({ sessionId: String(a.sessionId), studentId: String(a.studentId) })),
+    attendance: attendance.map((a) => ({ sessionId: String(a.sessionId), email: a.email })),
     now: new Date(),
   });
   res.json({ course: { id: course.id, name: course.name, defaultRadiusM: course.defaultRadiusM }, ...dashboard });
+});
+
+/** All sessions of a course, newest first, with how many attended each. Lecturer-only. */
+coursesRouter.get('/:id/sessions', requireRole('lecturer'), async (req, res) => {
+  const course = await findOwnCourse(String(req.params.id), req.auth!.sub);
+  if (!course) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  await closeExpiredSessions({ courseId: course._id });
+  const sessions = await Session.find({ courseId: course._id }, { status: 1, startsAt: 1, endsAt: 1 }).sort({ startsAt: -1 });
+  const counts = await Attendance.aggregate<{ _id: mongoose.Types.ObjectId; n: number }>([
+    { $match: { sessionId: { $in: sessions.map((s) => s._id) }, ...PRESENT } },
+    { $group: { _id: '$sessionId', n: { $sum: 1 } } },
+  ]);
+  const presentById = new Map(counts.map((c) => [String(c._id), c.n]));
+  res.json({
+    course: { id: course.id, name: course.name },
+    rosterCount: course.roster.length,
+    sessions: sessions.map((s) => ({ id: s.id as string, startsAt: s.startsAt, endsAt: s.endsAt, status: s.status, present: presentById.get(s.id) ?? 0 })),
+  });
 });
 
 function findOwnCourse(id: string, lecturerId: string) {
@@ -190,11 +211,13 @@ coursesRouter.get('/:id/sessions/active', async (req, res) => {
     res.json({ session: session ? toPublicSession(session) : null, serverNow: new Date() });
     return;
   }
-  const mine = session ? await Attendance.findOne({ sessionId: session._id, studentId: req.auth!.sub }, { checkedInAt: 1 }) : null;
+  const me = await User.findById(req.auth!.sub, { email: 1 });
+  const mine = session && me ? await Attendance.findOne({ sessionId: session._id, email: me.email }, { checkedInAt: 1, present: 1 }) : null;
   res.json({
     session: session ? toStudentSession(session) : null,
     courseName: course.name,
-    myCheckIn: mine ? { checkedInAt: mine.checkedInAt } : null,
+    myCheckIn: mine?.present ? { checkedInAt: mine.checkedInAt } : null,
+    markedAbsent: mine ? !mine.present : false,
     serverNow: new Date(),
   });
 });

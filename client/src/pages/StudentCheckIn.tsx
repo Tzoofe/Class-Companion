@@ -169,7 +169,12 @@ export default function StudentCheckIn() {
           <Done checkedInAt={doneAt} />
         ) : (
           state &&
-          (session ? (
+          (session && state.markedAbsent ? (
+            <div className="rounded-xl bg-amber-50 p-6 text-center text-amber-900 ring-1 ring-amber-200">
+              <p className="font-semibold">המרצה סימן/ה שלא נכחת במפגש הזה</p>
+              <p className="mt-1 text-sm">אם זו טעות, פנו למרצה.</p>
+            </div>
+          ) : session ? (
             <>
               <p className="text-center text-sm text-slate-500">נוכחות פתוחה עד {timeOf(session.endsAt)}</p>
               <CheckInFlow sessionId={session.id} onDone={setDoneAt} onClosed={() => setClosed(true)} />

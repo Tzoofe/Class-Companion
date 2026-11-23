@@ -117,8 +117,8 @@ describe('GET /api/courses', () => {
 
 describe('Attendance model', () => {
   it('allows only one attendance per student per session', async () => {
-    const ids = { sessionId: '64b000000000000000000001', studentId: '64b000000000000000000002' };
+    const ids = { sessionId: '64b000000000000000000001', email: 'dana@uni.ac.il' };
     await Attendance.create({ ...ids, source: 'gps' });
-    await expect(Attendance.create({ ...ids, source: 'manual' })).rejects.toThrow(/duplicate key/);
+    await expect(Attendance.create({ ...ids, email: 'DANA@uni.ac.il', source: 'manual' })).rejects.toThrow(/duplicate key/);
   });
 });

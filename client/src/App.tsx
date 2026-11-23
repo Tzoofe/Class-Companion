@@ -4,11 +4,13 @@ import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
 import AuthForm from './pages/AuthForm';
 import CourseDashboard from './pages/CourseDashboard';
+import CourseSessions from './pages/CourseSessions';
 import CourseStudents from './pages/CourseStudents';
 import Courses from './pages/Courses';
 import LecturerAttendance from './pages/LecturerAttendance';
 import DebugLocation from './pages/DebugLocation';
 import NewCourse from './pages/NewCourse';
+import SessionDetail from './pages/SessionDetail';
 import StudentCheckIn from './pages/StudentCheckIn';
 
 export default function App() {
@@ -28,6 +30,8 @@ export default function App() {
               <Route path="/courses/new" element={<NewCourse />} />
               <Route path="/courses/:id" element={<CourseDashboard />} />
               <Route path="/courses/:id/students" element={<CourseStudents />} />
+              <Route path="/courses/:id/sessions" element={<CourseSessions />} />
+              <Route path="/courses/:id/sessions/:sessionId" element={<SessionDetail />} />
               <Route path="/courses/:id/attendance" element={<LecturerAttendance />} />
             </Route>
           </Route>

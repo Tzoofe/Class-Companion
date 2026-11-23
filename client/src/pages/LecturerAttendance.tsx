@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ATTENDANCE_RULES } from '../../../shared/attendance';
 import { api, ApiError, type LiveSession, type SessionStatus } from '../api';
 import { OpenOnPhoneQr } from '../components/PhoneOnly';
+import SessionRoster from '../components/SessionRoster';
 import { ErrorBox, primaryButton } from '../components/ui';
 import { isMobileDevice } from '../hooks/useIsMobile';
 import { useLocationWatch } from '../hooks/useLocationWatch';
@@ -168,6 +169,10 @@ function LiveView({ sessionId }: { sessionId: string }) {
           חזרה ללוח הקורס
         </Link>
       )}
+
+      <div className="pt-2">
+        <SessionRoster sessionId={sessionId} live={active} onSummary={apply} />
+      </div>
     </div>
   );
 }

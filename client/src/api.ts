@@ -40,6 +40,8 @@ const HEBREW_ERRORS: Record<string, string> = {
   'Not in range': 'נראה שאינך בטווח הכיתה',
   'Session is not active': 'הנוכחות כבר נסגרה',
   'Already checked in': 'נוכחותך כבר נרשמה',
+  'Marked absent by lecturer': 'המרצה סימן/ה שלא נכחת במפגש הזה — אם זו טעות, פנו למרצה',
+  'Student not on roster': 'הסטודנט/ית לא ברשימת הקורס',
 };
 
 export class ApiError extends Error {
@@ -151,6 +153,8 @@ export interface StudentActive {
   session: { id: string; courseId: string; radiusM: number; startsAt: string; endsAt: string; status: 'active' | 'closed' } | null;
   courseName: string;
   myCheckIn: { checkedInAt: string } | null;
+  /** The lecturer marked this student absent for the open session. */
+  markedAbsent: boolean;
   serverNow: string;
 }
 
@@ -173,4 +177,25 @@ export interface CourseDashboard {
   history: { id: string; startsAt: string; present: number }[];
   atRisk: { email: string; firstName: string; lastName: string; attended: number; percent: number }[];
   atRiskThreshold: number;
+}
+
+export interface SessionRosterRow {
+  email: string;
+  firstName: string;
+  lastName: string;
+  registered: boolean;
+  present: boolean;
+  /** Lecturer marked absent explicitly (blocks GPS check-in while the session is open). */
+  markedAbsent: boolean;
+  source: 'gps' | 'manual' | null;
+  checkedInAt: string | null;
+  distanceM: number | null;
+}
+
+export type SessionRoster = SessionStatus & { students: SessionRosterRow[] };
+
+export interface CourseSessionsList {
+  course: { id: string; name: string };
+  rosterCount: number;
+  sessions: { id: string; startsAt: string; endsAt: string; status: 'active' | 'closed'; present: number }[];
 }
