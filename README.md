@@ -3,7 +3,8 @@
 A mobile-first web app for classroom attendance based on phone GPS proximity, with a lecturer dashboard.
 
 > **Status:** early development. Available now: accounts (lecturer / student), course creation from a
-> roster file, a course page with per-student attendance, starting / closing an attendance session from
+> roster file, a course dashboard (attendance per session, students who need attention, assignments placeholder),
+> a student list with per-student attendance, starting / closing an attendance session from
 > the lecturer's phone, GPS check-in for students ("I'm here"), and the location-accuracy debug tool
 > (`/debug/location`).
 
@@ -74,6 +75,7 @@ Geolocation on a phone requires HTTPS — see [docs/PHONE_TESTING.md](docs/PHONE
 | GET | `/api/courses` | any | lecturer: own courses · student: courses listing their email |
 | POST | `/api/courses/preview` | lecturer | parse a roster file `{ fileName, fileBase64 }` without saving |
 | POST | `/api/courses` | lecturer | create course `{ name, defaultRadiusM, fileName, fileBase64 }` |
+| GET | `/api/courses/:id/dashboard` | lecturer (own course) | counts, average attendance % and per-session history (finished sessions, last 12), live session count, up to 5 students under 70% |
 | GET | `/api/courses/:id/students` | lecturer (own course) | roster with signup status, attendance count / %, last seen, present in active session |
 | GET | `/api/courses/:id/sessions/active` | lecturer (own) / student (on roster) | the active session or `null` |
 | POST | `/api/courses/:id/sessions` | lecturer (own course) | start a session from `{ lat, lng, accuracy }`; 400 if accuracy > 100 m, 409 if one is active |

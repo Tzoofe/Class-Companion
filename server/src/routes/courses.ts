@@ -4,7 +4,7 @@ import { ATTENDANCE_RULES, isPreciseEnoughToStart } from '../../../shared/attend
 import { parseRosterFile } from '../lib/roster.js';
 import { closeExpiredSessions, toPublicSession, toStudentSession } from '../lib/sessions.js';
 import { readLocation } from '../lib/validate.js';
-import { buildStudentRows, isSessionActive } from '../lib/stats.js';
+import { buildDashboard, buildStudentRows, isSessionActive } from '../lib/stats.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Attendance } from '../models/Attendance.js';
 import { Course } from '../models/Course.js';
@@ -138,6 +138,30 @@ coursesRouter.get('/:id/students', requireRole('lecturer'), async (req, res) => 
     },
     students,
   });
+});
+
+/** Course dashboard: headline numbers, attendance per session, students who need attention. Lecturer-only. */
+coursesRouter.get('/:id/dashboard', requireRole('lecturer'), async (req, res) => {
+  const course = await findOwnCourse(String(req.params.id), req.auth!.sub);
+  if (!course) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  await closeExpiredSessions({ courseId: course._id });
+  const emails = course.roster.map((r) => r.email);
+  const [users, sessions] = await Promise.all([
+    User.find({ email: { $in: emails } }, { email: 1 }),
+    Session.find({ courseId: course._id }, { status: 1, startsAt: 1, endsAt: 1 }),
+  ]);
+  const attendance = await Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) } }, { sessionId: 1, studentId: 1 });
+  const dashboard = buildDashboard({
+    roster: course.roster.map((r) => ({ email: r.email, firstName: r.firstName, lastName: r.lastName })),
+    users: users.map((u) => ({ id: u.id as string, email: u.email })),
+    sessions: sessions.map((s) => ({ id: s.id as string, status: s.status, startsAt: s.startsAt, endsAt: s.endsAt })),
+    attendance: attendance.map((a) => ({ sessionId: String(a.sessionId), studentId: String(a.studentId) })),
+    now: new Date(),
+  });
+  res.json({ course: { id: course.id, name: course.name, defaultRadiusM: course.defaultRadiusM }, ...dashboard });
 });
 
 function findOwnCourse(id: string, lecturerId: string) {

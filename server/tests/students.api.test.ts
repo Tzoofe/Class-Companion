@@ -86,3 +86,46 @@ describe('GET /api/courses/:id/students', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('GET /api/courses/:id/dashboard', () => {
+  const dashboard = (id: string, token: string) => api().get(`/api/courses/${id}/dashboard`).set('Authorization', `Bearer ${token}`);
+
+  it('returns headline numbers, history and students who need attention', async () => {
+    const { course, dana, ron } = await setup();
+    const past1 = await makeSession(course._id, 'closed', -60 * 24);
+    const past2 = await makeSession(course._id, 'closed', -60);
+    const live = await makeSession(course._id, 'active', 10);
+    await Attendance.create([
+      { sessionId: past1._id, studentId: dana._id, source: 'manual' },
+      { sessionId: past2._id, studentId: dana._id, source: 'manual' },
+      { sessionId: past1._id, studentId: ron._id, source: 'manual' },
+      { sessionId: live._id, studentId: ron._id, source: 'manual' },
+    ]);
+    const res = await dashboard(course.id, await loginToken('lect@uni.ac.il'));
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      course: { id: course.id, name: 'C' },
+      rosterCount: 3,
+      registeredCount: 2,
+      sessionCount: 3,
+      finishedSessionCount: 2,
+      averagePercent: 50, // 3 check-ins / (2 × 3)
+      lastSession: { id: past2.id, present: 1 },
+      live: { id: live.id, present: 1 },
+    });
+    expect(res.body.history.map((h: { id: string }) => h.id)).toEqual([past1.id, past2.id]);
+    expect(res.body.atRisk.map((s: { email: string; percent: number }) => [s.email, s.percent])).toEqual([
+      ['late@uni.ac.il', 0],
+      ['ron@uni.ac.il', 50],
+    ]);
+  });
+
+  it("is lecturer-only and hides other lecturers' courses", async () => {
+    const { course } = await setup();
+    await createLecturer('other@uni.ac.il');
+    expect((await dashboard(course.id, await loginToken('other@uni.ac.il'))).status).toBe(404);
+    expect((await dashboard('not-an-id', await loginToken('lect@uni.ac.il'))).status).toBe(404);
+    const student = (await api().post('/api/auth/signup').send({ email: 'x@uni.ac.il', password: 'secret123' })).body.token;
+    expect((await dashboard(course.id, student)).status).toBe(403);
+  });
+});

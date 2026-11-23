@@ -159,3 +159,18 @@ export interface RangeResult {
   distanceM: number;
   alreadyCheckedIn: boolean;
 }
+
+export interface CourseDashboard {
+  course: { id: string; name: string; defaultRadiusM: number };
+  rosterCount: number;
+  registeredCount: number;
+  sessionCount: number;
+  finishedSessionCount: number;
+  /** Over finished sessions; null when none yet. */
+  averagePercent: number | null;
+  lastSession: { id: string; startsAt: string; present: number } | null;
+  live: { id: string; endsAt: string; present: number } | null;
+  history: { id: string; startsAt: string; present: number }[];
+  atRisk: { email: string; firstName: string; lastName: string; attended: number; percent: number }[];
+  atRiskThreshold: number;
+}

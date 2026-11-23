@@ -3,7 +3,8 @@ import { AuthProvider } from './auth';
 import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
 import AuthForm from './pages/AuthForm';
-import CourseDetail from './pages/CourseDetail';
+import CourseDashboard from './pages/CourseDashboard';
+import CourseStudents from './pages/CourseStudents';
 import Courses from './pages/Courses';
 import LecturerAttendance from './pages/LecturerAttendance';
 import DebugLocation from './pages/DebugLocation';
@@ -25,7 +26,8 @@ export default function App() {
             </Route>
             <Route element={<RequireAuth role="lecturer" />}>
               <Route path="/courses/new" element={<NewCourse />} />
-              <Route path="/courses/:id" element={<CourseDetail />} />
+              <Route path="/courses/:id" element={<CourseDashboard />} />
+              <Route path="/courses/:id/students" element={<CourseStudents />} />
               <Route path="/courses/:id/attendance" element={<LecturerAttendance />} />
             </Route>
           </Route>

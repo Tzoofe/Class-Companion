@@ -165,7 +165,7 @@ function LiveView({ sessionId }: { sessionId: string }) {
         </button>
       ) : (
         <Link to={`/courses/${session.courseId}`} className={`${primaryButton} block`}>
-          לרשימת הסטודנטים
+          חזרה ללוח הקורס
         </Link>
       )}
     </div>
