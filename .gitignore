@@ -4,3 +4,11 @@ dist/
 *.log
 .DS_Store
 
+
+# Local tooling / editor files (not part of the project)
+ex2/
+.claude/
+.specify/
+.vscode/
+.idea/
+coverage/
