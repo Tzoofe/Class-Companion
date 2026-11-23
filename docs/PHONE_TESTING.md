@@ -63,6 +63,15 @@ Suggested classroom test:
 
 These numbers will guide the default radius (currently planned as 20 m) and the 30 m activation threshold.
 
+## Testing phone-only screens on a laptop
+
+Attendance screens show a QR code on laptops. To use them on the laptop anyway:
+
+1. Add `?forceMobile=1` to the URL (remembered for the tab; `?forceMobile=0` turns it off).
+2. Fake the location: Chrome DevTools → ⋮ → More tools → **Sensors** → Location → *Other…* and enter
+   latitude / longitude. Accuracy is reported as ~150 m by default in some Chrome versions; if the start
+   button stays disabled, use a real phone instead.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -72,3 +81,4 @@ These numbers will guide the default radius (currently planned as 20 m) and the 
 | Accuracy stuck at hundreds of meters | Precise Location is off, or you're deep indoors — turn on Wi-Fi and wait. |
 | `Blocked request. This host is not allowed` | Host isn't `*.trycloudflare.com`; add it to `allowedHosts` in `client/vite.config.ts`. |
 | Tunnel page loads but data calls fail | `npm run dev:server` isn't running. |
+| QR code on the laptop opens nothing on the phone | The laptop is on `localhost`; open the tunnel URL on the laptop first, then scan. |

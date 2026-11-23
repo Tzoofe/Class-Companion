@@ -9,8 +9,10 @@ export interface Reading {
 
 export interface LocationWatch {
   latest: Reading | null;
-  /** Reading with the lowest accuracy value seen so far. */
+  /** Lowest-accuracy reading since the page opened. */
   best: Reading | null;
+  /** Lowest-accuracy reading within the last `windowMs` (falls back to the latest one). */
+  recentBest: Reading | null;
   count: number;
   error: string | null;
 }
@@ -21,11 +23,19 @@ const ERROR_TEXT: Record<number, string> = {
   3: 'תם הזמן לקבלת מיקום.',
 };
 
-/** Continuously watches the device position with high accuracy. */
-export function useLocationWatch(): LocationWatch {
-  const [state, setState] = useState<LocationWatch>({
+const lowest = (rs: Reading[]) => rs.reduce<Reading | null>((b, r) => (!b || r.accuracy < b.accuracy ? r : b), null);
+
+/**
+ * Continuously watches the device position with high accuracy.
+ * `recentBest` implements "best reading of the last ~10 s" so a stale precise
+ * reading is not used after the device moved.
+ */
+export function useLocationWatch(windowMs = 10_000): LocationWatch {
+  const [state, setState] = useState<LocationWatch & { recent: Reading[] }>({
     latest: null,
     best: null,
+    recentBest: null,
+    recent: [],
     count: 0,
     error: null,
   });
@@ -43,18 +53,23 @@ export function useLocationWatch(): LocationWatch {
           accuracy: pos.coords.accuracy,
           timestamp: pos.timestamp,
         };
-        setState((s) => ({
-          latest: r,
-          best: !s.best || r.accuracy < s.best.accuracy ? r : s.best,
-          count: s.count + 1,
-          error: null,
-        }));
+        setState((s) => {
+          const recent = [...s.recent, r].filter((x) => r.timestamp - x.timestamp <= windowMs);
+          return {
+            latest: r,
+            best: !s.best || r.accuracy < s.best.accuracy ? r : s.best,
+            recentBest: lowest(recent),
+            recent,
+            count: s.count + 1,
+            error: null,
+          };
+        });
       },
       (err) => setState((s) => ({ ...s, error: ERROR_TEXT[err.code] ?? err.message })),
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
     );
     return () => navigator.geolocation.clearWatch(id);
-  }, []);
+  }, [windowMs]);
 
   return state;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Attendance } from '../src/models/Attendance';
 import { Course } from '../src/models/Course';
-import { api, createLecturer, csv, loginToken, useTestDb } from './helpers';
+import { api, createLecturer, csv, loginToken, upload, useTestDb } from './helpers';
 
 useTestDb();
 
@@ -28,7 +28,7 @@ describe('POST /api/courses/preview', () => {
     const res = await api()
       .post('/api/courses/preview')
       .set('Authorization', `Bearer ${token}`)
-      .attach('file', ROSTER, 'roster.csv');
+      .send(upload(ROSTER, 'roster.csv'));
     expect(res.status).toBe(200);
     expect(res.body.entries).toHaveLength(2);
     expect(res.body.skipped).toEqual([{ row: 4, value: 'not-an-email', reason: 'invalid email' }]);
@@ -38,9 +38,12 @@ describe('POST /api/courses/preview', () => {
   it('rejects a missing file and unsupported types', async () => {
     const token = await lecturerToken();
     const auth = { Authorization: `Bearer ${token}` };
-    expect((await api().post('/api/courses/preview').set(auth)).status).toBe(400);
-    const pdf = await api().post('/api/courses/preview').set(auth).attach('file', Buffer.from('x'), 'r.pdf');
+    expect((await api().post('/api/courses/preview').set(auth).send({})).status).toBe(400);
+    const pdf = await api().post('/api/courses/preview').set(auth).send(upload(Buffer.from('x'), 'r.pdf'));
     expect(pdf.status).toBe(400);
+    const big = await api().post('/api/courses/preview').set(auth).send(upload(Buffer.alloc(2 * 1024 * 1024 + 1), 'r.csv'));
+    expect(big.status).toBe(400);
+    expect(big.body.error).toBe('File too large (max 2 MB)');
   });
 });
 
@@ -50,9 +53,7 @@ describe('POST /api/courses', () => {
     const res = await api()
       .post('/api/courses')
       .set('Authorization', `Bearer ${token}`)
-      .field('name', 'מבוא להנדסת תוכנה')
-      .field('defaultRadiusM', '25')
-      .attach('file', ROSTER, 'roster.csv');
+      .send(upload(ROSTER, 'roster.csv', { name: 'מבוא להנדסת תוכנה', defaultRadiusM: 25 }));
     expect(res.status).toBe(201);
     expect(res.body.course).toMatchObject({ name: 'מבוא להנדסת תוכנה', rosterCount: 2, defaultRadiusM: 25 });
     const saved = await Course.findById(res.body.course.id);
@@ -62,10 +63,10 @@ describe('POST /api/courses', () => {
   it('validates name, radius and that the file has emails', async () => {
     const token = await lecturerToken();
     const post = () => api().post('/api/courses').set('Authorization', `Bearer ${token}`);
-    expect((await post().field('name', '').attach('file', ROSTER, 'r.csv')).status).toBe(400);
-    expect((await post().field('name', 'C').field('defaultRadiusM', '0').attach('file', ROSTER, 'r.csv')).status).toBe(400);
+    expect((await post().send(upload(ROSTER, 'r.csv', { name: '' }))).status).toBe(400);
+    expect((await post().send(upload(ROSTER, 'r.csv', { name: 'C', defaultRadiusM: 0 }))).status).toBe(400);
     const empty = csv([['a', 'b'], ['c', 'd']]);
-    expect((await post().field('name', 'C').attach('file', empty, 'r.csv')).status).toBe(400);
+    expect((await post().send(upload(empty, 'r.csv', { name: 'C' }))).status).toBe(400);
   });
 
   it('is lecturer-only', async () => {
@@ -73,13 +74,12 @@ describe('POST /api/courses', () => {
     const res = await api()
       .post('/api/courses')
       .set('Authorization', `Bearer ${token}`)
-      .field('name', 'C')
-      .attach('file', ROSTER, 'r.csv');
+      .send(upload(ROSTER, 'r.csv', { name: 'C' }));
     expect(res.status).toBe(403);
   });
 
   it('requires login', async () => {
-    expect((await api().post('/api/courses').field('name', 'C')).status).toBe(401);
+    expect((await api().post('/api/courses').send({ name: 'C' })).status).toBe(401);
   });
 });
 

@@ -1,0 +1,186 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ATTENDANCE_RULES } from '../../../shared/attendance';
+import { api, ApiError, type LiveSession, type SessionStatus } from '../api';
+import PhoneOnly from '../components/PhoneOnly';
+import { ErrorBox, primaryButton } from '../components/ui';
+import { useLocationWatch } from '../hooks/useLocationWatch';
+
+const POLL_MS = 3000;
+const MAX_ACC = ATTENDANCE_RULES.lecturerMaxAccuracyM;
+
+/** Waits for a precise location, then lets the lecturer start the session. */
+function StartSession({ courseId, onStarted }: { courseId: string; onStarted: (s: LiveSession) => void }) {
+  const { recentBest, count, error: geoError } = useLocationWatch(10_000);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const precise = recentBest !== null && recentBest.accuracy <= MAX_ACC;
+
+  async function start() {
+    if (!recentBest) return;
+    setBusy(true);
+    setError('');
+    try {
+      const r = await api<{ session: LiveSession }>(`/courses/${courseId}/sessions`, {
+        method: 'POST',
+        json: { lat: recentBest.lat, lng: recentBest.lng, accuracy: recentBest.accuracy },
+      });
+      onStarted(r.session);
+    } catch (e) {
+      const err = e as ApiError;
+      // Someone (e.g. another device) already started one: just show it.
+      if (err.status === 409 && err.data.session) return onStarted(err.data.session as LiveSession);
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4 text-center">
+      <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        {recentBest ? (
+          <>
+            <div className={`text-5xl font-bold ${precise ? 'text-emerald-600' : 'text-amber-600'}`} dir="ltr">
+              ±{Math.round(recentBest.accuracy)} m
+            </div>
+            <p className="mt-3 text-sm text-slate-600">
+              {precise ? 'המיקום מדויק מספיק — אפשר להתחיל.' : `ממתין למיקום מדויק… (כרגע: ${Math.round(recentBest.accuracy)} מ׳, נדרש עד ${MAX_ACC} מ׳)`}
+            </p>
+          </>
+        ) : (
+          !geoError && <p className="py-4 text-slate-500">מאתר מיקום…</p>
+        )}
+        <p className="mt-1 text-xs text-slate-400">{count} קריאות</p>
+      </div>
+
+      {!precise && !geoError && (
+        <p className="rounded-lg bg-slate-100 p-3 text-sm text-slate-700">
+          עמדו בתוך הכיתה, רצוי ליד שולחן המרצה. Wi-Fi דלוק משפר את הדיוק בתוך מבנים.
+        </p>
+      )}
+      <ErrorBox>{geoError || error}</ErrorBox>
+
+      <button type="button" onClick={start} disabled={!precise || busy} className={`${primaryButton} py-4 text-lg`}>
+        {busy ? '…' : 'התחל נוכחות'}
+      </button>
+      <p className="text-xs text-slate-500">
+        המפגש יימשך {ATTENDANCE_RULES.defaultSessionMinutes} דקות, וניתן לסגור אותו מוקדם יותר.
+      </p>
+    </div>
+  );
+}
+
+function formatLeft(ms: number) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** Live counter (polled) + countdown + close. */
+function LiveView({ sessionId }: { sessionId: string }) {
+  const [status, setStatus] = useState<SessionStatus | null>(null);
+  const [clockOffset, setClockOffset] = useState(0); // serverNow − deviceNow
+  const [now, setNow] = useState(Date.now());
+  const [error, setError] = useState('');
+  const [closing, setClosing] = useState(false);
+
+  const apply = useCallback((s: SessionStatus) => {
+    setStatus(s);
+    setClockOffset(new Date(s.serverNow).getTime() - Date.now());
+    setError('');
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      api<SessionStatus>(`/sessions/${sessionId}`)
+        .then((s) => alive && apply(s))
+        .catch((e) => alive && setError(e.message));
+    load();
+    const poll = setInterval(load, POLL_MS);
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      alive = false;
+      clearInterval(poll);
+      clearInterval(tick);
+    };
+  }, [sessionId, apply]);
+
+  async function close() {
+    if (!window.confirm('לסגור את הנוכחות עכשיו? סטודנטים לא יוכלו עוד לסמן נוכחות.')) return;
+    setClosing(true);
+    try {
+      apply(await api<SessionStatus>(`/sessions/${sessionId}/close`, { method: 'POST' }));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setClosing(false);
+    }
+  }
+
+  if (!status) return <p className="text-center text-slate-500">{error || 'טוען…'}</p>;
+
+  const { session, checkedInCount, rosterCount } = status;
+  const msLeft = new Date(session.endsAt).getTime() - (now + clockOffset);
+  const active = session.status === 'active' && msLeft > 0;
+
+  return (
+    <div className="space-y-4 text-center">
+      <div className={`rounded-xl p-6 shadow-sm ring-1 ${active ? 'bg-white ring-emerald-200' : 'bg-slate-100 ring-slate-200'}`}>
+        <p className={`text-sm font-medium ${active ? 'text-emerald-700' : 'text-slate-600'}`}>
+          {active ? '● נוכחות פעילה' : 'המפגש נסגר'}
+        </p>
+        <div className="mt-2 text-6xl font-bold tabular-nums" dir="ltr">
+          {checkedInCount}
+          <span className="text-3xl text-slate-400">/{rosterCount}</span>
+        </div>
+        <p className="mt-1 text-sm text-slate-500">סימנו נוכחות</p>
+        {active && (
+          <p className="mt-4 text-lg tabular-nums" dir="ltr">
+            ⏱ {formatLeft(msLeft)}
+          </p>
+        )}
+      </div>
+
+      <p className="text-xs text-slate-500">
+        רדיוס {session.radiusM} מ׳ · דיוק נקודת המרכז ±{Math.round(session.centerAccuracyM)} מ׳
+      </p>
+      <ErrorBox>{error}</ErrorBox>
+
+      {active ? (
+        <button type="button" onClick={close} disabled={closing} className="w-full rounded-lg border-2 border-red-300 bg-white px-4 py-3 font-medium text-red-700 disabled:opacity-50">
+          {closing ? '…' : 'סגור נוכחות'}
+        </button>
+      ) : (
+        <Link to={`/courses/${session.courseId}`} className={`${primaryButton} block`}>
+          לרשימת הסטודנטים
+        </Link>
+      )}
+    </div>
+  );
+}
+
+export default function LecturerAttendance() {
+  const { id = '' } = useParams();
+  const [sessionId, setSessionId] = useState<string | null | undefined>(undefined); // undefined = loading
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api<{ session: LiveSession | null }>(`/courses/${id}/sessions/active`)
+      .then((r) => setSessionId(r.session?.id ?? null))
+      .catch((e) => setError(e.message));
+  }, [id]);
+
+  return (
+    <div className="mx-auto max-w-md space-y-4">
+      <Link to={`/courses/${id}`} className="text-sm text-slate-500 hover:underline">
+        → חזרה לקורס
+      </Link>
+      <PhoneOnly>
+        <ErrorBox>{error}</ErrorBox>
+        {sessionId === undefined && !error && <p className="text-center text-slate-500">טוען…</p>}
+        {sessionId === null && <StartSession courseId={id} onStarted={(s) => setSessionId(s.id)} />}
+        {sessionId && <LiveView sessionId={sessionId} />}
+      </PhoneOnly>
+    </div>
+  );
+}

@@ -1,4 +1,4 @@
-import { Schema, Types, model } from 'mongoose';
+import { Schema, Types, model, type HydratedDocument, type InferSchemaType } from 'mongoose';
 
 const pointSchema = new Schema(
   {
@@ -22,4 +22,5 @@ const sessionSchema = new Schema(
 );
 sessionSchema.index({ center: '2dsphere' });
 
+export type SessionDoc = HydratedDocument<InferSchemaType<typeof sessionSchema>>;
 export const Session = model('Session', sessionSchema);

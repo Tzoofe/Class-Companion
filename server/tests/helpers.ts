@@ -34,3 +34,10 @@ export async function loginToken(email: string, password = 'secret123'): Promise
 }
 
 export const csv = (rows: string[][]) => Buffer.from(rows.map((r) => r.join(',')).join('\n'), 'utf8');
+
+/** Body for roster upload endpoints. */
+export const upload = (file: Buffer, fileName: string, extra: Record<string, unknown> = {}) => ({
+  ...extra,
+  fileName,
+  fileBase64: file.toString('base64'),
+});

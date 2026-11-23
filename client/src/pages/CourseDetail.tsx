@@ -81,7 +81,15 @@ export default function CourseDetail() {
         <Link to="/courses" className="text-sm text-slate-500 hover:underline">
           → הקורסים שלי
         </Link>
-        <h1 className="mt-1 text-xl font-bold">{course.name}</h1>
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-bold">{course.name}</h1>
+          <Link
+            to={`/courses/${course.id}/attendance`}
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${live ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+          >
+            {live ? '● למפגש הפעיל' : 'התחל נוכחות'}
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

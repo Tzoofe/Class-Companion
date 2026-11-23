@@ -32,12 +32,22 @@ const HEBREW_ERRORS: Record<string, string> = {
   'Radius must be between 5 and 500 meters': 'הרדיוס חייב להיות בין 5 ל-500 מטר',
   'No valid emails found in the file': 'לא נמצאו כתובות אימייל תקינות בקובץ',
   'Course not found': 'הקורס לא נמצא',
+  'Session not found': 'המפגש לא נמצא',
+  'Invalid location': 'מיקום לא תקין',
+  'Location not precise enough': 'המיקום לא מדויק מספיק — המתינו לדיוק של עד 30 מ׳',
+  'Location too imprecise': 'המיקום לא מדויק מספיק — הפעילו "מיקום מדויק" עבור Safari/Chrome בהגדרות',
+  'Location reading too old': 'קריאת המיקום ישנה מדי — נסו שוב',
+  'Not in range': 'נראה שאינך בטווח הכיתה',
+  'Session is not active': 'הנוכחות כבר נסגרה',
+  'Already checked in': 'נוכחותך כבר נרשמה',
 };
 
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Parsed JSON body of the error response, if any. */
+    public data: Record<string, unknown> = {},
   ) {
     super(message);
   }
@@ -64,7 +74,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     if (res.status >= 500) throw new ApiError(res.status, 'שגיאת שרת, נסו שוב');
     if (res.status === 401 && path !== '/auth/login') tokenStore.set(null);
     const msg: string = data.error ?? '';
-    throw new ApiError(res.status, HEBREW_ERRORS[msg] ?? (msg.startsWith('Password must') ? 'הסיסמה חייבת להכיל לפחות 6 תווים' : msg || 'שגיאה'));
+    throw new ApiError(res.status, HEBREW_ERRORS[msg] ?? (msg.startsWith('Password must') ? 'הסיסמה חייבת להכיל לפחות 6 תווים' : msg || 'שגיאה'), data);
   }
   return data as T;
 }
@@ -117,4 +127,35 @@ export interface StudentRow {
 export interface CourseStudents {
   course: LecturerCourse & { registeredCount: number; sessionCount: number; activeSessionId: string | null };
   students: StudentRow[];
+}
+
+export interface LiveSession {
+  id: string;
+  courseId: string;
+  center: { lat: number; lng: number };
+  centerAccuracyM: number;
+  radiusM: number;
+  startsAt: string;
+  endsAt: string;
+  status: 'active' | 'closed';
+}
+
+export interface SessionStatus {
+  session: LiveSession & { courseName: string };
+  checkedInCount: number;
+  rosterCount: number;
+  serverNow: string;
+}
+
+export interface StudentActive {
+  session: { id: string; courseId: string; radiusM: number; startsAt: string; endsAt: string; status: 'active' | 'closed' } | null;
+  courseName: string;
+  myCheckIn: { checkedInAt: string } | null;
+  serverNow: string;
+}
+
+export interface RangeResult {
+  inRange: boolean;
+  distanceM: number;
+  alreadyCheckedIn: boolean;
 }

@@ -6,11 +6,15 @@ import { ErrorBox, Field, primaryButton } from '../components/ui';
 const REASON_HE: Record<string, string> = { 'invalid email': 'אימייל לא תקין', 'missing email': 'חסר אימייל' };
 const PREVIEW_ROWS = 5;
 
-function formWith(file: File, extra: Record<string, string> = {}) {
-  const fd = new FormData();
-  Object.entries(extra).forEach(([k, v]) => fd.append(k, v));
-  fd.append('file', file);
-  return fd;
+const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
+/** File → { fileName, fileBase64 } as the API expects. */
+async function fileBody(file: File, extra: Record<string, unknown> = {}) {
+  if (file.size > MAX_FILE_BYTES) throw new Error('הקובץ גדול מדי (עד 2MB)');
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return { ...extra, fileName: file.name, fileBase64: btoa(binary) };
 }
 
 export default function NewCourse() {
@@ -29,7 +33,7 @@ export default function NewCourse() {
     if (!f) return;
     setBusy(true);
     try {
-      setPreview(await api<RosterPreview>('/courses/preview', { method: 'POST', body: formWith(f) }));
+      setPreview(await api<RosterPreview>('/courses/preview', { method: 'POST', json: await fileBody(f) }));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -43,7 +47,7 @@ export default function NewCourse() {
     setBusy(true);
     setError('');
     try {
-      await api('/courses', { method: 'POST', body: formWith(file, { name, defaultRadiusM: radius }) });
+      await api('/courses', { method: 'POST', json: await fileBody(file, { name, defaultRadiusM: Number(radius) }) });
       navigate('/courses');
     } catch (err) {
       setError((err as Error).message);

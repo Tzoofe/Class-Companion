@@ -3,7 +3,9 @@
 A mobile-first web app for classroom attendance based on phone GPS proximity, with a lecturer dashboard.
 
 > **Status:** early development. Available now: accounts (lecturer / student), course creation from a
-> roster file, and the location-accuracy debug tool (`/debug/location`).
+> roster file, a course page with per-student attendance, starting / closing an attendance session from
+> the lecturer's phone, GPS check-in for students ("I'm here"), and the location-accuracy debug tool
+> (`/debug/location`).
 
 ## Stack
 
@@ -15,13 +17,16 @@ A mobile-first web app for classroom attendance based on phone GPS proximity, wi
 
 ## Setup
 
-Requires Node.js 22+ and a MongoDB database (a free [MongoDB Atlas](https://www.mongodb.com/atlas) M0 cluster works).
+Requires Node.js 22+ and MongoDB. Everything runs locally; settings live in `server/.env`, so moving
+to a hosted server / cloud database later is a configuration change.
 
-1. **Atlas:** create a free cluster → *Database Access*: add a user → *Network Access*: allow your IP
-   (or `0.0.0.0/0` for demos) → *Connect → Drivers*: copy the connection string.
-2. **Env:** `cp server/.env.example server/.env`, paste the string into `MONGODB_URI`
-   (add a database name before the `?`, e.g. `…mongodb.net/class-companion?…`), and set `JWT_SECRET`
-   (`openssl rand -hex 32`).
+1. **MongoDB (macOS):**
+   ```bash
+   brew tap mongodb/brew && brew install mongodb-community
+   brew services start mongodb/brew/mongodb-community   # runs in the background, starts at login
+   ```
+2. **Env:** `cp server/.env.example server/.env` and set `JWT_SECRET` (`openssl rand -hex 32`).
+   The default `MONGODB_URI` points at the local database.
 3. **Install and seed:**
 
 ```bash
@@ -67,11 +72,29 @@ Geolocation on a phone requires HTTPS — see [docs/PHONE_TESTING.md](docs/PHONE
 | POST | `/api/auth/login` | public | → `{ token, user }` |
 | GET | `/api/auth/me` | any | current user |
 | GET | `/api/courses` | any | lecturer: own courses · student: courses listing their email |
-| POST | `/api/courses/preview` | lecturer | parse a roster file (multipart `file`) without saving |
-| POST | `/api/courses` | lecturer | create course (multipart `name`, `defaultRadiusM`, `file`) |
+| POST | `/api/courses/preview` | lecturer | parse a roster file `{ fileName, fileBase64 }` without saving |
+| POST | `/api/courses` | lecturer | create course `{ name, defaultRadiusM, fileName, fileBase64 }` |
 | GET | `/api/courses/:id/students` | lecturer (own course) | roster with signup status, attendance count / %, last seen, present in active session |
+| GET | `/api/courses/:id/sessions/active` | lecturer (own) / student (on roster) | the active session or `null` |
+| POST | `/api/courses/:id/sessions` | lecturer (own course) | start a session from `{ lat, lng, accuracy }`; 400 if accuracy > 30 m, 409 if one is active |
+| GET | `/api/sessions/:id` | lecturer (own) | session + `checkedInCount` / `rosterCount` (polled every 3 s) |
+| POST | `/api/sessions/:id/close` | lecturer (own) | close early (`endsAt` = close time) |
+| POST | `/api/sessions/:id/range` | student (on roster) | `{ lat, lng, accuracy, timestamp }` → `{ inRange, distanceM, alreadyCheckedIn }`; no side effects |
+| POST | `/api/sessions/:id/check-in` | student (on roster) | re-validates range with a fresh reading (≤ 30 s) and records attendance once (409 if already) |
 
 Authenticated requests send `Authorization: Bearer <token>`.
+
+## Attendance rules
+
+Defined once in `shared/attendance.ts` and used by both server and client:
+
+- **In range** ⇔ `distance(student, center) − studentAccuracy − centerAccuracy ≤ radius`
+  (Haversine distance in a pure, unit-tested function; `$geoNear` was not used because the rule needs both
+  accuracy circles, and only one point is ever compared against one center).
+- Lecturer can start a session only with accuracy ≤ 30 m; student readings > 100 m are rejected.
+- A session lasts 15 minutes (radius from the course, default 20 m) and auto-closes at `endsAt` the next time it is read.
+- Only one active session per course.
+- Students never receive the session center; the server computes distance and range.
 
 ## Project layout
 

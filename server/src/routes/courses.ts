@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
-import multer from 'multer';
+import { ATTENDANCE_RULES, isPreciseEnoughToStart } from '../../../shared/attendance.js';
 import { parseRosterFile } from '../lib/roster.js';
+import { closeExpiredSessions, toPublicSession, toStudentSession } from '../lib/sessions.js';
+import { readLocation } from '../lib/validate.js';
 import { buildStudentRows, isSessionActive } from '../lib/stats.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Attendance } from '../models/Attendance.js';
@@ -10,7 +12,8 @@ import { Session } from '../models/Session.js';
 import { User } from '../models/User.js';
 
 export const coursesRouter = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+/** Roster files arrive as base64 in JSON ({ fileName, fileBase64 }) — works the same locally and on Cloud Functions. */
+const MAX_FILE_BYTES = 2 * 1024 * 1024;
 
 coursesRouter.use(requireAuth);
 
@@ -47,28 +50,34 @@ class HttpError extends Error {
   }
 }
 
-async function parseUpload(file: Express.Multer.File | undefined) {
-  if (!file) throw new HttpError(400, 'Missing roster file');
+async function parseUpload(body: unknown) {
+  const { fileName, fileBase64 } = (body ?? {}) as Record<string, unknown>;
+  if (typeof fileName !== 'string' || typeof fileBase64 !== 'string' || !fileBase64) {
+    throw new HttpError(400, 'Missing roster file');
+  }
+  const buffer = Buffer.from(fileBase64, 'base64');
+  if (buffer.length > MAX_FILE_BYTES) throw new HttpError(400, 'File too large (max 2 MB)');
   try {
-    return await parseRosterFile(file.buffer, file.originalname);
+    return await parseRosterFile(buffer, fileName);
   } catch (e) {
     throw new HttpError(400, (e as Error).message);
   }
 }
 
 /** Parses a roster file without saving anything, so the lecturer can check it first. */
-coursesRouter.post('/preview', requireRole('lecturer'), upload.single('file'), async (req, res) => {
+coursesRouter.post('/preview', requireRole('lecturer'), async (req, res) => {
   try {
-    res.json(await parseUpload(req.file));
+    res.json(await parseUpload(req.body));
   } catch (e) {
     if (e instanceof HttpError) res.status(e.status).json({ error: e.message });
     else throw e;
   }
 });
 
-coursesRouter.post('/', requireRole('lecturer'), upload.single('file'), async (req, res) => {
+coursesRouter.post('/', requireRole('lecturer'), async (req, res) => {
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
-  const radius = req.body?.defaultRadiusM ? Number(req.body.defaultRadiusM) : 20;
+  const rawRadius = req.body?.defaultRadiusM;
+  const radius = rawRadius === undefined || rawRadius === '' ? ATTENDANCE_RULES.defaultRadiusM : Number(rawRadius);
   if (!name) {
     res.status(400).json({ error: 'Course name is required' });
     return;
@@ -78,7 +87,7 @@ coursesRouter.post('/', requireRole('lecturer'), upload.single('file'), async (r
     return;
   }
   try {
-    const parsed = await parseUpload(req.file);
+    const parsed = await parseUpload(req.body);
     if (parsed.entries.length === 0) {
       res.status(400).json({ error: 'No valid emails found in the file' });
       return;
@@ -93,12 +102,12 @@ coursesRouter.post('/', requireRole('lecturer'), upload.single('file'), async (r
 
 /** Roster with per-student attendance stats. Lecturer-only; other lecturers' courses look like 404. */
 coursesRouter.get('/:id/students', requireRole('lecturer'), async (req, res) => {
-  const id = String(req.params.id);
-  const course = mongoose.isValidObjectId(id) ? await Course.findOne({ _id: id, lecturerId: req.auth!.sub }) : null;
+  const course = await findOwnCourse(String(req.params.id), req.auth!.sub);
   if (!course) {
     res.status(404).json({ error: 'Course not found' });
     return;
   }
+  await closeExpiredSessions({ courseId: course._id });
   const emails = course.roster.map((r) => r.email);
   const [users, sessions] = await Promise.all([
     User.find({ email: { $in: emails } }, { email: 1 }),
@@ -129,4 +138,73 @@ coursesRouter.get('/:id/students', requireRole('lecturer'), async (req, res) => 
     },
     students,
   });
+});
+
+function findOwnCourse(id: string, lecturerId: string) {
+  return mongoose.isValidObjectId(id) ? Course.findOne({ _id: id, lecturerId }) : Promise.resolve(null);
+}
+
+/** Lecturer: own course. Student: course whose roster lists their email. */
+async function findAccessibleCourse(id: string, auth: { sub: string; role: string }) {
+  if (!mongoose.isValidObjectId(id)) return null;
+  if (auth.role === 'lecturer') return Course.findOne({ _id: id, lecturerId: auth.sub });
+  const me = await User.findById(auth.sub, { email: 1 });
+  return me ? Course.findOne({ _id: id, 'roster.email': me.email }) : null;
+}
+
+/** The course's currently active session, or null. */
+coursesRouter.get('/:id/sessions/active', async (req, res) => {
+  const course = await findAccessibleCourse(String(req.params.id), req.auth!);
+  if (!course) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  await closeExpiredSessions({ courseId: course._id });
+  const session = await Session.findOne({ courseId: course._id, status: 'active' });
+  if (req.auth!.role === 'lecturer') {
+    res.json({ session: session ? toPublicSession(session) : null, serverNow: new Date() });
+    return;
+  }
+  const mine = session ? await Attendance.findOne({ sessionId: session._id, studentId: req.auth!.sub }, { checkedInAt: 1 }) : null;
+  res.json({
+    session: session ? toStudentSession(session) : null,
+    courseName: course.name,
+    myCheckIn: mine ? { checkedInAt: mine.checkedInAt } : null,
+    serverNow: new Date(),
+  });
+});
+
+/** Start an attendance session centered on the lecturer's (precise) location. */
+coursesRouter.post('/:id/sessions', requireRole('lecturer'), async (req, res) => {
+  const course = await findOwnCourse(String(req.params.id), req.auth!.sub);
+  if (!course) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  const loc = readLocation(req.body);
+  if (!loc) {
+    res.status(400).json({ error: 'Invalid location' });
+    return;
+  }
+  if (!isPreciseEnoughToStart(loc.accuracy)) {
+    res.status(400).json({ error: 'Location not precise enough', maxAccuracyM: ATTENDANCE_RULES.lecturerMaxAccuracyM });
+    return;
+  }
+  await closeExpiredSessions({ courseId: course._id });
+  const existing = await Session.findOne({ courseId: course._id, status: 'active' });
+  if (existing) {
+    res.status(409).json({ error: 'A session is already active', session: toPublicSession(existing) });
+    return;
+  }
+  const now = new Date();
+  const session = await Session.create({
+    courseId: course._id,
+    center: { type: 'Point', coordinates: [loc.lng, loc.lat] },
+    centerAccuracyM: loc.accuracy,
+    radiusM: course.defaultRadiusM,
+    startsAt: now,
+    endsAt: new Date(now.getTime() + ATTENDANCE_RULES.defaultSessionMinutes * 60_000),
+    status: 'active',
+  });
+  res.status(201).json({ session: toPublicSession(session) });
 });

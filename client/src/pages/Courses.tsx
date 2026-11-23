@@ -47,10 +47,14 @@ export default function Courses() {
                 </p>
               </Link>
             ) : (
-              <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+              <Link
+                to={`/courses/${c.id}/checkin`}
+                className="block rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 transition hover:ring-indigo-300"
+              >
                 <h2 className="font-semibold">{c.name}</h2>
                 {c.lecturerName && <p className="mt-1 text-sm text-slate-500">מרצה: {c.lecturerName}</p>}
-              </div>
+                <p className="mt-2 text-sm font-medium text-indigo-700">סימון נוכחות ←</p>
+              </Link>
             )}
           </li>
         ))}
