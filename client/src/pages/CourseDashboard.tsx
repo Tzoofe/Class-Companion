@@ -9,13 +9,21 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString('he-IL', { d
 const longDate = (iso: string) =>
   new Date(iso).toLocaleString('he-IL', { weekday: 'short', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-function Tile({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
-  return (
-    <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+function Tile({ label, value, sub, to }: { label: string; value: ReactNode; sub?: ReactNode; to?: string }) {
+  const body = (
+    <>
       <div className="text-xs text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-500">{sub}</div>}
-    </div>
+    </>
+  );
+  const cls = 'block rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200';
+  return to ? (
+    <Link to={to} className={`${cls} transition hover:ring-indigo-300`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }
 
@@ -157,8 +165,9 @@ export default function CourseDashboard() {
         <Tile label="מפגשים" value={data.sessionCount} sub={data.live ? 'כולל המפגש הפעיל' : undefined} />
         <Tile
           label="מפגש אחרון"
+          to={data.lastSession ? `/courses/${course.id}/sessions/${data.lastSession.id}` : undefined}
           value={data.lastSession ? `${data.lastSession.present}/${rosterCount}` : '—'}
-          sub={data.lastSession ? longDate(data.lastSession.startsAt) : 'עוד לא התקיים'}
+          sub={data.lastSession ? `${longDate(data.lastSession.startsAt)} · עריכה ←` : 'עוד לא התקיים'}
         />
       </div>
 

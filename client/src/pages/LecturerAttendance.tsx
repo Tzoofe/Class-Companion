@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ATTENDANCE_RULES } from '../../../shared/attendance';
-import { api, ApiError, type LiveSession, type SessionStatus } from '../api';
+import { api, ApiError, type CourseSessionsList, type LiveSession, type SessionStatus } from '../api';
 import { OpenOnPhoneQr } from '../components/PhoneOnly';
 import SessionRoster from '../components/SessionRoster';
 import { ErrorBox, primaryButton } from '../components/ui';
@@ -177,6 +177,33 @@ function LiveView({ sessionId }: { sessionId: string }) {
   );
 }
 
+const lastWhen = (iso: string) =>
+  new Date(iso).toLocaleString('he-IL', { weekday: 'short', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+/** When no session is open: a way back to the latest (closed) session to fix its attendance. */
+function LastSessionLink({ courseId }: { courseId: string }) {
+  const [list, setList] = useState<CourseSessionsList | null>(null);
+  useEffect(() => {
+    api<CourseSessionsList>(`/courses/${courseId}/sessions`).then(setList, () => setList(null));
+  }, [courseId]);
+  const last = list?.sessions[0];
+  if (!last) return null;
+  return (
+    <Link
+      to={`/courses/${courseId}/sessions/${last.id}`}
+      className="flex items-center justify-between gap-3 rounded-xl bg-white p-4 text-start shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+    >
+      <span>
+        <span className="block text-sm font-medium">המפגש האחרון · {lastWhen(last.startsAt)}</span>
+        <span className="text-xs text-slate-500">
+          {last.present}/{list.rosterCount} נוכחים · אפשר לסמן ולתקן נוכחות גם אחרי שנסגר
+        </span>
+      </span>
+      <span className="shrink-0 text-sm text-indigo-700">עריכה ←</span>
+    </Link>
+  );
+}
+
 export default function LecturerAttendance() {
   const { id = '' } = useParams();
   const [sessionId, setSessionId] = useState<string | null | undefined>(undefined); // undefined = loading
@@ -195,7 +222,12 @@ export default function LecturerAttendance() {
       </Link>
       <ErrorBox>{error}</ErrorBox>
       {sessionId === undefined && !error && <p className="text-center text-slate-500">טוען…</p>}
-      {sessionId === null && <StartSession courseId={id} onStarted={(s) => setSessionId(s.id)} />}
+      {sessionId === null && (
+        <>
+          <StartSession courseId={id} onStarted={(s) => setSessionId(s.id)} />
+          <LastSessionLink courseId={id} />
+        </>
+      )}
       {sessionId && <LiveView sessionId={sessionId} />}
     </div>
   );

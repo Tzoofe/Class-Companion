@@ -98,6 +98,9 @@ export default function SessionRoster({ sessionId, live, onSummary }: { sessionI
           {presentCount}/{data.students.length} נוכחים
         </span>
       </div>
+      {data.session.status === 'closed' && (
+        <p className="rounded-lg bg-slate-100 p-2.5 text-sm text-slate-700">המפגש נסגר — עדיין אפשר לסמן ולתקן נוכחות ידנית.</p>
+      )}
       <input
         type="search"
         placeholder="חיפוש לפי שם או אימייל"
