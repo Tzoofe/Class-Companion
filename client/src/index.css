@@ -128,6 +128,20 @@
       0 1px 2px rgb(23 20 31 / 0.04);
   }
 
+  /* Bento tiles: no border; separation comes from the surface color and the gap. */
+  .tile {
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+  :root[data-theme="light"] .tile {
+    box-shadow: 0 1px 2px rgb(23 20 31 / 0.05), 0 0 0 1px rgb(23 20 31 / 0.03);
+  }
+  /* The one main tile on a screen */
+  .tile-hero {
+    border-radius: var(--radius-card);
+    background: var(--color-accent-soft);
+  }
+
   /* Small tinted square holding an icon */
   .icon-tile {
     display: inline-grid;

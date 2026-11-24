@@ -2,11 +2,11 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 /**
- * Bento grid: 2 columns on phones, 4 on desktop. Tile size carries importance —
- * one large tile per screen, a few medium ones, the rest small.
+ * Bento grid: 2 columns on phones, 4 on desktop, generous gaps.
+ * Keep it to a few tiles per screen, each with one job; actions and settings live in the page header.
  */
 export function Bento({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`grid grid-flow-row-dense grid-cols-2 gap-3 lg:grid-cols-4 lg:auto-rows-[minmax(9.5rem,auto)] ${className}`}>{children}</div>;
+  return <div className={`grid grid-flow-row-dense grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5 ${className}`}>{children}</div>;
 }
 
 /** Column/row spans per size, phone → desktop. */
@@ -19,7 +19,7 @@ const SIZE = {
   wide: 'col-span-2',
   /** 1×2 on desktop (full width on phones). */
   tall: 'col-span-2 lg:col-span-1 lg:row-span-2',
-  /** 2×2: the hero tile. */
+  /** 2×2. */
   lg: 'col-span-2 lg:row-span-2',
   /** Full row. */
   full: 'col-span-2 lg:col-span-4',
@@ -28,7 +28,8 @@ const SIZE = {
 export type TileSize = keyof typeof SIZE;
 
 /**
- * One tile. `title` sits at the top as a quiet label with an optional icon; `action` at the other end.
+ * One tile. Three levels of emphasis: `hero` (tinted, one per screen), `plain` (surface), and plain rows
+ * inside tiles. `title` is a real heading; `action` is a quiet text link at the other end.
  * With `to`, the whole tile is a link (don't put other links inside it then).
  */
 export function Tile({
@@ -46,30 +47,30 @@ export function Tile({
   icon?: ReactNode;
   action?: ReactNode;
   to?: string;
-  /** 'accent': the one highlighted tile on a screen. */
-  tone?: 'plain' | 'accent';
+  tone?: 'plain' | 'hero' | 'accent';
   className?: string;
   children: ReactNode;
 }) {
+  const hero = tone === 'hero' || tone === 'accent';
   const body = (
     <>
       {(title || action) && (
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="mb-4 flex items-baseline justify-between gap-3">
           {title && (
-            <span className={`flex min-w-0 items-center gap-2 text-sm ${tone === 'accent' ? 'text-accent-ink' : 'text-ink-3'}`}>
+            <h2 className={`flex min-w-0 items-center gap-2 ${hero ? 'text-xl' : 'text-lg'}`}>
               {icon && <span className="shrink-0 text-base">{icon}</span>}
               <span className="truncate">{title}</span>
-            </span>
+            </h2>
           )}
-          {action && <span className="shrink-0 text-sm">{action}</span>}
+          {action && <span className="shrink-0 text-sm text-ink-3">{action}</span>}
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </>
   );
-  const cls = `card flex flex-col p-5 ${SIZE[size]} ${tone === 'accent' ? '!bg-accent-soft' : ''} ${className}`;
+  const cls = `${hero ? 'tile-hero' : 'tile'} flex flex-col p-6 ${SIZE[size]} ${className}`;
   return to ? (
-    <Link to={to} className={`${cls} transition-colors hover:bg-surface-2`}>
+    <Link to={to} className={`${cls} transition-[filter] hover:brightness-110`}>
       {body}
     </Link>
   ) : (
@@ -77,12 +78,21 @@ export function Tile({
   );
 }
 
-/** Big number with a quiet unit/caption, for small tiles. */
+/** Big number with a quiet caption. */
 export function Figure({ value, caption }: { value: ReactNode; caption?: ReactNode }) {
   return (
     <div className="mt-auto">
       <p className="font-display text-4xl leading-none tabular-nums">{value}</p>
       {caption && <p className="mt-2 text-sm text-ink-3">{caption}</p>}
     </div>
+  );
+}
+
+/** Quiet underlined text link used for tile actions. */
+export function TextLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link to={to} className="text-ink-2 underline decoration-line-strong underline-offset-4 hover:text-ink hover:decoration-ink-3">
+      {children}
+    </Link>
   );
 }

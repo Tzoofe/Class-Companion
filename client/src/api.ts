@@ -445,7 +445,24 @@ export interface Agenda {
   hasSchedule: boolean;
 }
 
+export interface LessonRecap {
+  courseId: string;
+  courseName: string;
+  sessionId: string;
+  startsAt: string;
+  endsAt: string;
+  rosterCount: number;
+  present: number;
+  manual: number;
+  questions: number;
+  unanswered: number;
+  suggestions: number;
+  polls: { id: string; question: string; responses: number; top: { text: string; percent: number | null } | null }[];
+}
+
 export interface LecturerOverview {
+  /** Today's last finished lesson, when nothing is live. */
+  recap: LessonRecap | null;
   live: {
     sessions: { courseId: string; courseName: string; sessionId: string; present: number; manual: number; rosterCount: number; endsAt: string }[];
     polls: { courseId: string; courseName: string; pollId: string; question: string; responses: number }[];

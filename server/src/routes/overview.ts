@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { lastLessonRecap } from '../lib/recap.js';
 import { closeExpiredSessions } from '../lib/sessions.js';
 import { buildDashboard, isSessionActive } from '../lib/stats.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
@@ -78,7 +79,10 @@ overviewRouter.get('/me/overview', requireAuth, requireRole('lecturer'), async (
     };
   });
 
+  const recap = liveSessions.length ? null : await lastLessonRecap(courses, sessions, now);
+
   res.json({
+    recap,
     live: {
       sessions: liveSessions,
       polls: openPolls.map((p) => ({ courseId: String(p.courseId), courseName: name.get(String(p.courseId)) ?? '', pollId: p.id as string, question: p.question, responses: answersByPoll.get(p.id as string) ?? 0 })),

@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, downloadFile, type CourseDashboard as Dashboard } from '../api';
-import { Bento, Figure, Tile } from '../components/Bento';
+import { Bento, TextLink, Tile } from '../components/Bento';
 import DotGrid, { DotLegend } from '../components/DotGrid';
-import { IconAlert, IconBook, IconCalendar, IconChart, IconCheck, IconPoll, IconQuestion, IconSettings, IconUsers } from '../components/icons';
 import { BackLink, ErrorBox, ghostButton, pillButton } from '../components/ui';
 
 const LIVE_POLL_MS = 5000;
@@ -68,6 +67,22 @@ export default function CourseDashboard() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
+  const menu = useRef<HTMLDetailsElement>(null);
+
+  // Close the "עוד" menu on a click outside it or on Escape.
+  useEffect(() => {
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      const el = menu.current;
+      if (!el?.open) return;
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !el.contains(e.target as Node)) el.open = false;
+    };
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('click', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, []);
 
   async function exportFile() {
     setExporting(true);
@@ -115,32 +130,38 @@ export default function CourseDashboard() {
 
   const { course, rosterCount } = data;
   const shown = data.live ?? data.lastSession;
+  const avgCount = data.averagePercent === null ? null : Math.round((data.averagePercent / 100) * rosterCount);
+  const poll = data.polls.open;
+  const menuLink = 'block rounded-lg px-3 py-2 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink';
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <div className="flex items-center justify-between gap-3 text-sm">
-          <BackLink to="/courses">הקורסים שלי</BackLink>
-          <span className="flex gap-4">
-            <Link to={`/courses/${course.id}/schedule`} className="inline-flex items-center gap-1.5 text-accent-ink hover:underline">
-              <IconCalendar />
-              לוח זמנים
-            </Link>
-            <Link to={`/courses/${course.id}/settings`} className="inline-flex items-center gap-1.5 text-accent-ink hover:underline">
-              <IconSettings />
-              הגדרות
-            </Link>
-          </span>
-        </div>
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+        <BackLink to="/courses">הקורסים שלי</BackLink>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl">{course.name}</h1>
-          <div className="flex gap-2">
-            <button type="button" onClick={exportFile} disabled={exporting} className={ghostButton}>
-              {exporting ? '…' : 'ייצוא'}
-            </button>
+          <div className="flex items-center gap-2">
             <Link to={`/courses/${course.id}/attendance`} className={data.live ? 'rounded-full bg-good-strong px-4 py-2 text-sm font-medium text-white' : pillButton}>
               {data.live ? 'למפגש הפעיל' : 'התחלת נוכחות'}
             </Link>
+            <button type="button" onClick={exportFile} disabled={exporting} className={ghostButton}>
+              {exporting ? '…' : 'ייצוא'}
+            </button>
+            <details ref={menu} className="relative">
+              <summary className={`${ghostButton} cursor-pointer list-none [&::-webkit-details-marker]:hidden`} aria-label="עוד">
+                עוד
+              </summary>
+              <div className="absolute end-0 z-20 mt-2 w-52 rounded-2xl bg-elevated p-1.5 shadow-lg ring-1 ring-line">
+                <Link to={`/courses/${course.id}/students`} className={menuLink}>רשימת הסטודנטים</Link>
+                <Link to={`/courses/${course.id}/sessions`} className={menuLink}>כל המפגשים</Link>
+                <Link to={`/courses/${course.id}/schedule`} className={menuLink}>לוח זמנים</Link>
+                <Link to={`/courses/${course.id}/feed`} className={menuLink}>שאלות והערות</Link>
+                <Link to={`/courses/${course.id}/polls`} className={menuLink}>סקרים</Link>
+                <Link to={`/courses/${course.id}/feed/present`} className={menuLink}>מסך הקרנה: שאלות</Link>
+                <Link to={`/courses/${course.id}/polls/present`} className={menuLink}>מסך הקרנה: סקר</Link>
+                <Link to={`/courses/${course.id}/settings`} className={menuLink}>הגדרות הקורס</Link>
+              </div>
+            </details>
           </div>
         </div>
       </div>
@@ -148,122 +169,101 @@ export default function CourseDashboard() {
       <ErrorBox>{error}</ErrorBox>
 
       <Bento>
-        {/* Hero: the class, live or last time */}
+        {/* The class: live or last time. The one emphasized tile. */}
         <Tile
-          size="lg"
-          title={data.live ? 'נוכחות פתוחה עכשיו' : shown ? `המפגש האחרון, ${longDate(data.lastSession!.startsAt)}` : 'נוכחות'}
-          icon={data.live ? <span className="block h-2 w-2 rounded-full bg-good motion-safe:animate-pulse" /> : <IconCheck />}
-          to={data.live ? `/courses/${course.id}/attendance` : data.lastSession ? `/courses/${course.id}/sessions/${data.lastSession.id}` : undefined}
+          size="wide"
+          tone="hero"
+          title={data.live ? 'נוכחות פתוחה עכשיו' : shown ? 'המפגש האחרון' : 'נוכחות'}
+          action={
+            data.live ? (
+              <TextLink to={`/courses/${course.id}/attendance`}>למסך הנוכחות</TextLink>
+            ) : data.lastSession ? (
+              <TextLink to={`/courses/${course.id}/sessions/${data.lastSession.id}`}>{longDate(data.lastSession.startsAt)}</TextLink>
+            ) : undefined
+          }
         >
-          {shown ? (
-            <>
-              <DotGrid present={shown.present} manual={shown.manual} total={rosterCount} size="lg" />
-              <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-6">
+          <DotGrid present={shown?.present ?? 0} manual={shown?.manual ?? 0} total={rosterCount} size="lg" />
+          <div className="mt-auto pt-6">
+            {shown ? (
+              <>
                 <p className="font-display text-5xl leading-none tabular-nums">
                   {shown.present}
                   <span className="text-2xl text-ink-3"> מתוך {rosterCount} סטודנטים</span>
-            <span className="mt-2 block font-sans text-sm text-ink-3">{data.live ? 'סימנו נוכחות עד עכשיו' : 'נכחו במפגש'}</span>
                 </p>
-                <DotLegend withManual={shown.manual > 0} />
-              </div>
-            </>
-          ) : (
-            <>
-              <DotGrid present={0} total={rosterCount} size="lg" label={`${rosterCount} סטודנטים, עוד לא התקיים מפגש`} />
-              <p className="mt-auto pt-6 text-ink-2">עוד לא התקיים מפגש. כשתפתחו נוכחות, הכיתה תתמלא כאן.</p>
-            </>
-          )}
+                <p className="mt-2 text-sm text-ink-3">{data.live ? 'סימנו נוכחות עד עכשיו' : 'נכחו במפגש'}</p>
+              </>
+            ) : (
+              <p className="text-ink-2">{rosterCount} סטודנטים בקורס. עוד לא התקיים מפגש.</p>
+            )}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <DotLegend withManual={!!shown?.manual} />
+              <span className="text-xs text-ink-3">
+                {data.registeredCount} מתוך {rosterCount} נרשמו לאפליקציה
+              </span>
+            </div>
+          </div>
         </Tile>
 
-        <Tile size="sm" title="סטודנטים" icon={<IconUsers />} to={`/courses/${course.id}/students`}>
-          <Figure value={rosterCount} caption={`${data.registeredCount} נרשמו לאפליקציה`} />
-        </Tile>
-        <Tile size="sm" title="מפגש אחרון מול הממוצע" icon={<IconCheck />}>
-          {data.lastSession && data.averagePercent !== null ? (
-            <Figure
-              value={data.lastSession.present}
-              caption={`נכחו במפגש האחרון. בממוצע נוכחים ${Math.round((data.averagePercent / 100) * rosterCount)} (${data.averagePercent}%).`}
-            />
-          ) : (
-            <p className="mt-auto text-sm text-ink-3">יופיע אחרי המפגש הראשון.</p>
-          )}
-        </Tile>
-        <Tile size="sm" title="שאלות פתוחות" icon={<IconQuestion />} to={`/courses/${course.id}/feed`}>
-          <Figure value={data.feed.openQuestions} caption={`${data.feed.totalPosts} הודעות בסך הכל`} />
-        </Tile>
-        <Tile size="sm" title={data.polls.open ? 'סקר פתוח' : 'סקרים'} icon={<IconPoll />} to={`/courses/${course.id}/polls`} tone={data.polls.open ? 'accent' : 'plain'}>
-          {data.polls.open ? <p className="line-clamp-3 text-sm text-ink-2">{data.polls.open.question}</p> : <Figure value={data.polls.total} caption="סקרים בסך הכל" />}
-        </Tile>
-
-        <Tile
-          size="wide"
-          title="נוכחות לפי מפגש"
-          icon={<IconChart />}
-          action={
-            data.sessionCount > 0 && (
-              <Link to={`/courses/${course.id}/sessions`} className="text-accent-ink hover:underline">
-                כל המפגשים
-              </Link>
-            )
-          }
-        >
+        <Tile size="wide" title="מגמה" action={data.sessionCount > 0 ? <TextLink to={`/courses/${course.id}/sessions`}>כל המפגשים</TextLink> : undefined}>
+          {data.lastSession && avgCount !== null ? (
+            <p className="mb-4 text-ink-2">
+              במפגש האחרון נכחו <strong className="font-medium text-ink">{data.lastSession.present}</strong>, ובממוצע נוכחים{' '}
+              <strong className="font-medium text-ink">{avgCount}</strong> ({data.averagePercent}%).
+            </p>
+          ) : null}
           <AttendanceChart courseId={course.id} history={data.history} rosterCount={rosterCount} />
         </Tile>
 
-        <Tile
-          size="tall"
-          title="דורשים תשומת לב"
-          icon={<IconAlert />}
-          action={
-            <Link to={`/courses/${course.id}/students`} className="text-accent-ink hover:underline">
-              כולם
-            </Link>
-          }
-        >
+        <Tile size="wide" title="דורשים תשומת לב" action={<TextLink to={`/courses/${course.id}/students`}>כל הסטודנטים</TextLink>}>
           {!data.attendanceRequired ? (
             <p className="text-sm text-ink-3">
               הנוכחות בקורס הזה אינה חובה, ולכן אף סטודנט/ית לא מסומן/ת כאן.{' '}
-              <Link to={`/courses/${course.id}/settings`} className="text-accent-ink underline">
-                שינוי בהגדרות
-              </Link>
+              <TextLink to={`/courses/${course.id}/settings`}>שינוי בהגדרות</TextLink>
             </p>
           ) : data.finishedSessionCount === 0 ? (
             <p className="text-sm text-ink-3">יופיע אחרי המפגש הראשון.</p>
           ) : data.atRisk.length === 0 ? (
-            <p className="text-sm text-good">כל הסטודנטים מעל {data.atRiskThreshold}% נוכחות.</p>
+            <p className="text-sm text-ink-2">כל הסטודנטים מעל {data.atRiskThreshold}% נוכחות.</p>
           ) : (
             <>
-              <p className="mb-1 text-xs text-ink-3">מתחת ל-{data.atRiskThreshold}%, מהנמוכה לגבוהה</p>
-              <ul className="-mx-1 divide-y divide-line">
+              <ul className="divide-y divide-line">
                 {data.atRisk.map((s) => (
-                  <li key={s.email} className="flex items-center justify-between gap-2 px-1 py-2 text-sm">
+                  <li key={s.email} className="flex items-center justify-between gap-2 py-2.5 text-sm">
                     <span className="truncate">
                       {s.firstName} {s.lastName}
                     </span>
-                    <span className={`shrink-0 tabular-nums ${s.percent < 50 ? 'text-bad' : 'text-warn'}`}>{s.percent}%</span>
+                    <span className="shrink-0 tabular-nums text-warn">
+                      {s.attended} מתוך {data.finishedSessionCount} מפגשים
+                    </span>
                   </li>
                 ))}
               </ul>
-              {data.atRiskCount > data.atRisk.length && <p className="mt-auto pt-2 text-xs text-ink-3">ועוד {data.atRiskCount - data.atRisk.length}</p>}
+              <p className="mt-auto pt-3 text-xs text-ink-3">
+                נוכחות מתחת ל-{data.atRiskThreshold}%{data.atRiskCount > data.atRisk.length ? `, ועוד ${data.atRiskCount - data.atRisk.length} ברשימה המלאה` : ''}.
+              </p>
             </>
           )}
         </Tile>
 
-        <Tile size="sm" title="נוכחות" icon={<IconSettings />} to={`/courses/${course.id}/settings`}>
-          <Figure value={data.attendanceRequired ? 'חובה' : 'רשות'} caption={`${data.sessionCount} מפגשים`} />
-        </Tile>
-        <Tile size="wide" title="מסכי הקרנה" icon={<IconPoll />}>
-          <div className="mt-auto flex flex-wrap gap-2">
-            <Link to={`/courses/${course.id}/feed/present`} className={ghostButton}>
-              שאלות פתוחות
-            </Link>
-            <Link to={`/courses/${course.id}/polls/present`} className={ghostButton}>
-              תוצאות סקר
-            </Link>
-          </div>
-        </Tile>
-        <Tile size="sm" title="מטלות" icon={<IconBook />}>
-          <p className="mt-auto text-sm text-ink-3">בקרוב: מטלות ותאריכי הגשה.</p>
+        <Tile size="wide" title="פעילות בכיתה">
+          <ul className="divide-y divide-line">
+            <li className="flex items-center justify-between gap-3 py-2.5 text-sm">
+              <span className="min-w-0">
+                <span className="block">{poll ? 'סקר פתוח' : 'סקרים'}</span>
+                <span className="block truncate text-ink-3">{poll ? poll.question : `${data.polls.total} סקרים עד עכשיו`}</span>
+              </span>
+              <TextLink to={`/courses/${course.id}/polls`}>{poll ? 'לתוצאות' : 'לסקרים'}</TextLink>
+            </li>
+            <li className="flex items-center justify-between gap-3 py-2.5 text-sm">
+              <span>
+                <span className="block">שאלות פתוחות</span>
+                <span className="block text-ink-3">
+                  {data.feed.openQuestions ? `${data.feed.openQuestions} מחכות לתשובה` : 'אין שאלות שמחכות לתשובה'}, {data.feed.totalPosts} הודעות בסך הכל
+                </span>
+              </span>
+              <TextLink to={`/courses/${course.id}/feed`}>לשאלות</TextLink>
+            </li>
+          </ul>
         </Tile>
       </Bento>
     </div>
