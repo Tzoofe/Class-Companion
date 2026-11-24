@@ -10,6 +10,7 @@ import CourseSchedulePage from './pages/CourseSchedulePage';
 import CourseSessions from './pages/CourseSessions';
 import CourseSettings from './pages/CourseSettings';
 import CourseStudents from './pages/CourseStudents';
+import CourseSummaries from './pages/CourseSummaries';
 import Courses from './pages/Courses';
 import LecturerAttendance from './pages/LecturerAttendance';
 import DebugLocation from './pages/DebugLocation';
@@ -17,6 +18,7 @@ import FeedPresent from './pages/FeedPresent';
 import NewCourse from './pages/NewCourse';
 import PollPresent from './pages/PollPresent';
 import SessionDetail from './pages/SessionDetail';
+import SummaryDetail from './pages/SummaryDetail';
 import StudentCheckIn from './pages/StudentCheckIn';
 
 export default function App() {
@@ -35,6 +37,8 @@ export default function App() {
             <Route path="/courses" element={<Courses />} />
             <Route path="/courses/:id/feed" element={<CourseFeed />} />
             <Route path="/courses/:id/polls" element={<CoursePolls />} />
+            <Route path="/courses/:id/summaries" element={<CourseSummaries />} />
+            <Route path="/courses/:id/summaries/:summaryId" element={<SummaryDetail />} />
             <Route element={<RequireAuth role="student" />}>
               <Route path="/courses/:id/checkin" element={<StudentCheckIn />} />
             </Route>

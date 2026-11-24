@@ -6,6 +6,7 @@ import { pollsRouter } from './routes/polls.js';
 import { postsRouter } from './routes/posts.js';
 import { pushRouter } from './routes/push.js';
 import { scheduleRouter } from './routes/schedule.js';
+import { summariesRouter } from './routes/summaries.js';
 import { sessionsRouter } from './routes/sessions.js';
 
 export function createApp() {
@@ -23,6 +24,7 @@ export function createApp() {
   app.use('/api', pollsRouter);
   app.use('/api', scheduleRouter);
   app.use('/api', overviewRouter);
+  app.use('/api', summariesRouter);
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found' });

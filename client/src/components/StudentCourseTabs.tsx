@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import OpenPollBanner from './OpenPollBanner';
 
-type Tab = 'checkin' | 'feed' | 'polls';
+type Tab = 'checkin' | 'feed' | 'polls' | 'summaries';
 
 /** Tabs on a student's course pages, plus a banner when a poll is waiting for an answer. */
 export default function StudentCourseTabs({ courseId, active }: { courseId: string; active: Tab }) {
@@ -18,8 +18,9 @@ export default function StudentCourseTabs({ courseId, active }: { courseId: stri
     <div className="space-y-3">
       <nav className="flex rounded-xl bg-surface-2 p-1">
         {tab('checkin', `/courses/${courseId}/checkin`, 'נוכחות')}
-        {tab('feed', `/courses/${courseId}/feed`, 'שאלות והערות')}
+        {tab('feed', `/courses/${courseId}/feed`, 'שאלות')}
         {tab('polls', `/courses/${courseId}/polls`, 'סקרים')}
+        {tab('summaries', `/courses/${courseId}/summaries`, 'סיכומים')}
       </nav>
       {active !== 'polls' && <OpenPollBanner courseId={courseId} />}
     </div>

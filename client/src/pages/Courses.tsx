@@ -135,6 +135,22 @@ function RecapTile({ recap }: { recap: LessonRecap }) {
           </span>
           {recap.questions + recap.suggestions > 0 && <TextLink to={`/courses/${recap.courseId}/feed`}>לשאלות</TextLink>}
         </li>
+        <li className="flex items-center justify-between gap-3 py-2.5">
+          <span>
+            {!recap.summary
+              ? 'סיכום שיעור: אפשר להעלות את ההקלטה מזום'
+              : recap.summary.status === 'published'
+                ? 'סיכום השיעור פורסם לסטודנטים'
+                : recap.summary.status === 'draft'
+                  ? 'טיוטת סיכום מוכנה לבדיקה'
+                  : recap.summary.status === 'failed'
+                    ? 'יצירת הסיכום נכשלה'
+                    : 'הסיכום בהכנה…'}
+          </span>
+          <TextLink to={recap.summary ? `/courses/${recap.courseId}/summaries/${recap.summary.id}` : `/courses/${recap.courseId}/summaries`}>
+            {recap.summary ? 'לסיכום' : 'העלאה'}
+          </TextLink>
+        </li>
         {recap.polls.map((p) => (
           <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
             <span className="min-w-0">

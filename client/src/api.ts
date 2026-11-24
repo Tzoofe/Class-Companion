@@ -79,6 +79,13 @@ const HEBREW_ERRORS: Record<string, string> = {
   'Event not found': 'האירוע לא נמצא',
   'Student already on roster': 'הסטודנט/ית כבר ברשימה',
   'Invalid setting': 'הגדרה לא תקינה',
+  'Unsupported file type': 'סוג קובץ לא נתמך. אפשר להעלות הקלטה (mp4, m4a, mp3, wav, webm, mov) או תמלול (vtt, srt, txt)',
+  'The transcript is empty': 'התמלול ריק',
+  'The file is empty': 'הקובץ ריק',
+  'File too large': 'הקובץ גדול מדי',
+  'Summary not found': 'הסיכום לא נמצא',
+  'Summary is still being processed': 'הסיכום עדיין בעיבוד',
+  'Nothing to summarize: upload the recording again': 'אין מה לסכם, העלו את ההקלטה שוב',
 };
 
 export class ApiError extends Error {
@@ -458,6 +465,7 @@ export interface LessonRecap {
   unanswered: number;
   suggestions: number;
   polls: { id: string; question: string; responses: number; top: { text: string; percent: number | null } | null }[];
+  summary: { id: string; status: SummaryStatus } | null;
 }
 
 export interface LecturerOverview {
@@ -491,3 +499,60 @@ export interface LecturerOverview {
 }
 
 export const WEEKDAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+
+// ── Lesson summaries ──
+
+export type SummaryStatus = 'queued' | 'transcribing' | 'summarizing' | 'draft' | 'published' | 'failed';
+
+export interface SummaryContent {
+  overview: string;
+  topics: { at: number | null; title: string; points: string[] }[];
+  concepts: { term: string; definition: string }[];
+  reminders: string[];
+  confusion: string[];
+  reviewQuestions: string[];
+}
+
+export interface LessonSummaryView {
+  id: string;
+  courseId: string;
+  sessionId: string | null;
+  date: string;
+  title: string;
+  source: 'upload' | 'zoom';
+  sourceName: string;
+  status: SummaryStatus;
+  progress: number;
+  error: string;
+  content: SummaryContent;
+  publishedAt: string | null;
+  createdAt: string;
+  transcriptSegments: number;
+}
+
+export const isProcessing = (s: { status: SummaryStatus }) => s.status === 'queued' || s.status === 'transcribing' || s.status === 'summarizing';
+
+/** Uploads a file as the raw request body, reporting progress (0–1). */
+export function uploadFile<T>(path: string, file: File, onProgress: (fraction: number) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api${path}`);
+    const token = tokenStore.get();
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    xhr.onerror = () => reject(new ApiError(0, 'אין חיבור לשרת'));
+    xhr.onload = () => {
+      let data: Record<string, unknown> = {};
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        /* not JSON */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as T);
+      const msg = String(data.error ?? '');
+      reject(new ApiError(xhr.status, xhr.status >= 500 ? 'שגיאת שרת, נסו שוב' : (HEBREW_ERRORS[msg] ?? (msg || 'ההעלאה נכשלה')), data));
+    };
+    xhr.send(file);
+  });
+}

@@ -52,6 +52,7 @@ describe('overview recap', () => {
       unanswered: 1,
       suggestions: 1,
       polls: [{ question: 'הבנתם?', responses: 1, top: { text: 'כן', percent: 100 } }],
+      summary: null,
     });
   });
 

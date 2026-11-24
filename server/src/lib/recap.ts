@@ -1,6 +1,7 @@
 import type mongoose from 'mongoose';
 import { config } from '../config.js';
 import { Attendance, PRESENT } from '../models/Attendance.js';
+import { LessonSummary } from '../models/LessonSummary.js';
 import { Poll, PollResponse } from '../models/Poll.js';
 import { Post } from '../models/Post.js';
 import { aggregate } from './polls.js';
@@ -46,10 +47,11 @@ export async function lastLessonRecap(
   const course = courses.find((c) => String(c._id) === String(session.courseId));
   if (!course) return null;
 
-  const [present, posts, polls] = await Promise.all([
+  const [present, posts, polls, summary] = await Promise.all([
     Attendance.find({ sessionId: session._id, ...PRESENT }, { source: 1 }),
     Post.find({ sessionId: session._id, hidden: false }, { kind: 1, status: 1 }),
     Poll.find({ sessionId: session._id, status: { $ne: 'draft' } }).sort({ openedAt: 1 }),
+    LessonSummary.findOne({ sessionId: session._id }, { status: 1 }).sort({ createdAt: -1 }),
   ]);
   const responses = await PollResponse.find({ pollId: { $in: polls.map((p) => p._id) } });
   const questions = posts.filter((p) => p.kind === 'question');
@@ -66,6 +68,7 @@ export async function lastLessonRecap(
     questions: questions.length,
     unanswered: questions.filter((q) => q.status === 'open').length,
     suggestions: posts.length - questions.length,
+    summary: summary ? { id: summary.id as string, status: summary.status } : null,
     polls: polls.map((p) => {
       const rs = responses.filter((r) => String(r.pollId) === String(p._id));
       const results = aggregate(p, rs.map((r) => ({ optionIds: r.optionIds ?? undefined, value: r.value ?? undefined, text: r.text ?? undefined })));

@@ -123,6 +123,20 @@ questions sorted by votes and a QR code to join. Posts written without a connect
 and sent automatically when it reconnects (safe to retry: the server de-duplicates by `clientId`). The
 export adds a *שאלות והערות* sheet.
 
+## Lesson summaries (local AI)
+
+The lecturer uploads a lesson recording (mp4/m4a/mp3/…) or a Zoom transcript (vtt/srt/txt). Everything runs on
+the server machine, free and offline: **ffmpeg** + **whisper.cpp** transcribe Hebrew audio, and a local model
+through **Ollama** (default `aya-expanse:8b`) summarizes it in ~10-minute parts, then writes an overview,
+review questions and "where students struggled" (using that lesson's feed questions and poll results).
+Topic timestamps come from the transcript. Results are drafts: the lecturer edits and publishes; students get a
+push notification and a "סיכומים" tab. Recordings are deleted after transcription.
+
+One-time setup (macOS): `brew install ffmpeg whisper-cpp ollama && brew services start ollama`,
+`ollama pull aya-expanse:8b`, and download `ggml-large-v3-turbo.bin` from the whisper.cpp models repository into
+`~/.cache/class-companion/whisper/`. Settings: `OLLAMA_MODEL`, `OLLAMA_URL`, `WHISPER_MODEL`, `MEDIA_DIR`,
+`MAX_UPLOAD_MB` in `server/.env`.
+
 ## Home pages & schedule
 
 - **Lecturer home:** what's live now (open attendance / polls), **today** from the schedule (with a one-tap

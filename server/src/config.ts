@@ -35,6 +35,25 @@ export const config = {
       .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
       .filter(Boolean);
   },
+  /** Local AI for lesson summaries (everything runs on this machine). */
+  ollama: {
+    url: process.env.OLLAMA_URL || 'http://127.0.0.1:11434',
+    model: process.env.OLLAMA_MODEL || 'aya-expanse:8b',
+    contextTokens: Number(process.env.OLLAMA_CONTEXT || 8192),
+  },
+  whisper: {
+    bin: process.env.WHISPER_BIN || 'whisper-cli',
+    model: process.env.WHISPER_MODEL || `${process.env.HOME}/.cache/class-companion/whisper/ggml-large-v3-turbo.bin`,
+    language: process.env.WHISPER_LANGUAGE || 'he',
+  },
+  ffmpegBin: process.env.FFMPEG_BIN || 'ffmpeg',
+  /** Where uploaded/downloaded recordings wait for transcription (deleted afterwards). */
+  get mediaDir() {
+    return process.env.MEDIA_DIR || `${process.env.HOME}/.cache/class-companion/media`;
+  },
+  get maxUploadMb() {
+    return Number(process.env.MAX_UPLOAD_MB || 2048);
+  },
   jwtExpiresIn: '7d',
   minPasswordLength: 6,
 };
