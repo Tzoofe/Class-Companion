@@ -2,7 +2,7 @@ import type { Types } from 'mongoose';
 import { Session, type SessionDoc } from '../models/Session.js';
 
 /** Sessions auto-close at endsAt: called before any read, so no background job is needed. */
-export async function closeExpiredSessions(filter: { courseId?: Types.ObjectId | string; _id?: Types.ObjectId | string } = {}) {
+export async function closeExpiredSessions(filter: { courseId?: Types.ObjectId | string | { $in: Types.ObjectId[] }; _id?: Types.ObjectId | string } = {}) {
   await Session.updateMany({ ...filter, status: 'active', endsAt: { $lte: new Date() } }, { status: 'closed' });
 }
 

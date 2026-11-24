@@ -1,9 +1,11 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { authRouter } from './routes/auth.js';
 import { coursesRouter } from './routes/courses.js';
+import { overviewRouter } from './routes/overview.js';
 import { pollsRouter } from './routes/polls.js';
 import { postsRouter } from './routes/posts.js';
 import { pushRouter } from './routes/push.js';
+import { scheduleRouter } from './routes/schedule.js';
 import { sessionsRouter } from './routes/sessions.js';
 
 export function createApp() {
@@ -19,6 +21,8 @@ export function createApp() {
   app.use('/api/push', pushRouter);
   app.use('/api', postsRouter);
   app.use('/api', pollsRouter);
+  app.use('/api', scheduleRouter);
+  app.use('/api', overviewRouter);
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found' });

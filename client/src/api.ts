@@ -63,6 +63,20 @@ const HEBREW_ERRORS: Record<string, string> = {
   'Choose one answer': 'בחרו תשובה אחת',
   'Invalid answer': 'בחרו תשובה',
   'Answer is too long': 'התשובה ארוכה מדי (עד 200 תווים)',
+  'Invalid schedule': 'מערכת השעות לא תקינה',
+  'Too many weekly slots': 'יותר מדי שיעורים בשבוע (עד 14)',
+  'Invalid class time': 'שעת סיום חייבת להיות אחרי שעת ההתחלה',
+  'Invalid date': 'תאריך לא תקין',
+  'Semester ends before it starts': 'סוף הסמסטר לפני תחילתו',
+  'Invalid event type': 'סוג אירוע לא תקין',
+  'Invalid start time': 'שעת התחלה לא תקינה',
+  'Invalid end time': 'שעת הסיום חייבת להיות אחרי שעת ההתחלה',
+  'Title is required': 'יש להזין כותרת',
+  'Link must start with http:// or https://': 'הקישור צריך להתחיל ב-https://',
+  'Choose a class on that day to cancel': 'בחרו שיעור שמתקיים ביום הזה',
+  'That class is already cancelled': 'השיעור הזה כבר בוטל',
+  'Event not found': 'האירוע לא נמצא',
+  'Student already on roster': 'הסטודנט/ית כבר ברשימה',
 };
 
 export class ApiError extends Error {
@@ -340,3 +354,116 @@ export interface PollDraft {
   audience: 'roster' | 'present';
   showTextOnScreen: boolean;
 }
+
+const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
+/** File → { fileName, fileBase64 } as the API expects for roster uploads. */
+export async function fileBody(file: File, extra: Record<string, unknown> = {}) {
+  if (file.size > MAX_FILE_BYTES) throw new Error('הקובץ גדול מדי (עד 2MB)');
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return { ...extra, fileName: file.name, fileBase64: btoa(binary) };
+}
+
+// ── Course settings, schedule & agenda ──
+
+export interface RosterMember {
+  email: string;
+  firstName: string;
+  lastName: string;
+  registered: boolean;
+}
+
+export interface CourseSettings {
+  id: string;
+  name: string;
+  defaultRadiusM: number;
+  roster: RosterMember[];
+}
+
+export interface Slot {
+  id?: string;
+  weekday: number;
+  start: string;
+  end: string;
+  title: string;
+  place: string;
+}
+
+export type EventKind = 'extra' | 'cancelled' | 'office' | 'meeting' | 'exam' | 'other';
+
+export interface CourseEvent {
+  id: string;
+  courseId: string;
+  kind: EventKind;
+  date: string;
+  start: string | null;
+  end: string | null;
+  title: string;
+  place: string;
+  link: string;
+  notes: string;
+  slotId: string | null;
+}
+
+export interface CourseSchedule {
+  course: { id: string; name: string };
+  schedule: Slot[];
+  semesterStart: string | null;
+  semesterEnd: string | null;
+  events: CourseEvent[];
+  today: string;
+}
+
+export interface AgendaItem {
+  date: string;
+  start: string;
+  end: string | null;
+  courseId: string;
+  courseName: string;
+  kind: 'class' | Exclude<EventKind, 'cancelled'>;
+  title: string;
+  place: string;
+  link: string;
+  notes: string;
+  cancelled: boolean;
+  slotId?: string;
+  eventId?: string;
+}
+
+export interface Agenda {
+  now: { date: string; time: string; weekday: number };
+  from: string;
+  days: number;
+  items: AgendaItem[];
+  hasSchedule: boolean;
+}
+
+export interface LecturerOverview {
+  live: {
+    sessions: { courseId: string; courseName: string; sessionId: string; present: number; rosterCount: number; endsAt: string }[];
+    polls: { courseId: string; courseName: string; pollId: string; question: string; responses: number }[];
+  };
+  totals: { courses: number; students: number; openQuestions: number; weekAttendancePercent: number | null };
+  attention: {
+    questions: { courseId: string; courseName: string; postId: string; text: string; votes: number; createdAt: string }[];
+    atRisk: { courseId: string; courseName: string; count: number }[];
+  };
+  courses: {
+    id: string;
+    name: string;
+    rosterCount: number;
+    registeredCount: number;
+    sessionCount: number;
+    averagePercent: number | null;
+    lastSession: { startsAt: string; present: number } | null;
+    trend: number[];
+    openQuestions: number;
+    pollOpen: boolean;
+    liveSession: boolean;
+    atRiskCount: number;
+  }[];
+}
+
+export const WEEKDAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];

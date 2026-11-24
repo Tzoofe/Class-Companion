@@ -1,21 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, type RosterPreview } from '../api';
+import { api, fileBody, type RosterPreview } from '../api';
 import { ErrorBox, Field, primaryButton } from '../components/ui';
 
 const REASON_HE: Record<string, string> = { 'invalid email': 'אימייל לא תקין', 'missing email': 'חסר אימייל' };
 const PREVIEW_ROWS = 5;
 
-const MAX_FILE_BYTES = 2 * 1024 * 1024;
-
-/** File → { fileName, fileBase64 } as the API expects. */
-async function fileBody(file: File, extra: Record<string, unknown> = {}) {
-  if (file.size > MAX_FILE_BYTES) throw new Error('הקובץ גדול מדי (עד 2MB)');
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return { ...extra, fileName: file.name, fileBase64: btoa(binary) };
-}
 
 export default function NewCourse() {
   const navigate = useNavigate();

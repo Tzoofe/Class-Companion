@@ -102,6 +102,12 @@ Authenticated requests send `Authorization: Bearer <token>`.
 | POST | `/api/polls/:id/open` · `/close` · `/reveal` · `/duplicate` | lecturer | opening closes the course's other open poll and notifies eligible students |
 | DELETE | `/api/polls/:id` | lecturer | delete with its answers |
 | PUT | `/api/polls/:id/response` | eligible student | answer or change the answer while open |
+| GET | `/api/me/overview` | lecturer | home page: live sessions & polls, totals, top open questions, low-attendance counts, per-course cards (trend, average, last session) |
+| GET | `/api/me/agenda?from&days` | any | classes and events of all my courses (lecturer: own; student: roster), with local `now` |
+| GET · PATCH | `/api/courses/:id/settings` · `/api/courses/:id` | lecturer (own) | settings view; rename / change default radius |
+| POST · DELETE · PUT | `/api/courses/:id/roster[/:email]` | lecturer (own) | add one student · remove one · re-upload a file (`mode: merge\|replace`) |
+| GET · PUT | `/api/courses/:id/schedule` | member · lecturer | weekly slots (`weekday`, `start`, `end`, `title`, `place`) and semester dates; changes notify students |
+| POST · PUT · DELETE | `/api/courses/:id/events` · `/api/events/:id` | lecturer (own) | one-off events: extra lesson, office hours, meeting, exam, other, or `cancelled` (one occurrence of a slot); upcoming changes notify students |
 | GET | `/api/push/public-key` | public | VAPID public key for subscribing (`null` if push isn't configured) |
 | POST | `/api/push/subscribe` | any | save this device's push subscription (`PushSubscription.toJSON()`); endpoint must be a known push service |
 | POST | `/api/push/unsubscribe` | any | `{ endpoint }` — remove one of your own devices |
@@ -116,6 +122,17 @@ pins and hides them, and can open a full-screen **projector view** (`/courses/:i
 questions sorted by votes and a QR code to join. Posts written without a connection are kept on the phone
 and sent automatically when it reconnects (safe to retry: the server de-duplicates by `clientId`). The
 export adds a *שאלות והערות* sheet.
+
+## Home pages & schedule
+
+- **Lecturer home:** what's live now (open attendance / polls), **today** from the schedule (with a one-tap
+  "start attendance" for the class in progress), totals, what needs attention (top open questions, students
+  under 70%), and course cards with an attendance trend.
+- **Student home:** the week's classes and events of their courses (from the roster), with "check in" for the
+  class in progress, plus their courses.
+- Each course has a **schedule** (weekly slots + optional semester dates) and **one-off events**; students get
+  push notifications when upcoming items are added, changed or cancelled. Times are local (`TIME_ZONE`).
+- **Course settings:** rename, default radius, add/remove students, re-upload the roster (merge or replace).
 
 ## Polls
 

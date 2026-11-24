@@ -4,7 +4,7 @@ import { ATTENDANCE_RULES, isPreciseEnoughToStart } from '../../../shared/attend
 import { announceSessionStarted } from '../lib/push.js';
 import { findAccessibleCourse, findOwnCourse } from '../lib/access.js';
 import { buildCourseWorkbook } from '../lib/export.js';
-import { parseRosterFile } from '../lib/roster.js';
+import { isEmail, normalizeEmail, parseRosterFile } from '../lib/roster.js';
 import { closeExpiredSessions, toPublicSession, toStudentSession } from '../lib/sessions.js';
 import { readLocation } from '../lib/validate.js';
 import { buildDashboard, buildStudentRows, isSessionActive } from '../lib/stats.js';
@@ -102,6 +102,143 @@ coursesRouter.post('/', requireRole('lecturer'), async (req, res) => {
     }
     const course = await Course.create({ name, lecturerId: req.auth!.sub, roster: parsed.entries, defaultRadiusM: radius });
     res.status(201).json({ course: { id: course.id, name: course.name, rosterCount: course.roster.length, defaultRadiusM: radius } });
+  } catch (e) {
+    if (e instanceof HttpError) res.status(e.status).json({ error: e.message });
+    else throw e;
+  }
+});
+
+/** Course settings: name, radius and the roster (with signup status). Lecturer-only. */
+coursesRouter.get('/:id/settings', requireRole('lecturer'), async (req, res) => {
+  const course = await findOwnCourse(String(req.params.id), req.auth!.sub);
+  if (!course) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  res.json({ course: await settingsView(course) });
+});
+
+async function settingsView(course: NonNullable<Awaited<ReturnType<typeof findOwnCourse>>>) {
+  const users = await User.find({ email: { $in: course.roster.map((r) => r.email) } }, { email: 1 });
+  const registered = new Set(users.map((u) => u.email));
+  const collator = new Intl.Collator('he');
+  return {
+    id: course.id as string,
+    name: course.name,
+    defaultRadiusM: course.defaultRadiusM,
+    roster: course.roster
+      .map((r) => ({ email: r.email, firstName: r.firstName, lastName: r.lastName, registered: registered.has(r.email) }))
+      .sort((a, b) => collator.compare(a.lastName, b.lastName) || collator.compare(a.firstName, b.firstName)),
+  };
+}
+
+/** Rename / change the default radius (used for future sessions). */
+coursesRouter.patch('/:id', requireRole('lecturer'), async (req, res) => {
+  const course = await findOwnCourse(String(req.params.id), req.auth!.sub);
+  if (!course) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  const { name, defaultRadiusM } = (req.body ?? {}) as Record<string, unknown>;
+  if (name !== undefined) {
+    if (typeof name !== 'string' || !name.trim()) {
+      res.status(400).json({ error: 'Course name is required' });
+      return;
+    }
+    course.name = name.trim().slice(0, 120);
+  }
+  if (defaultRadiusM !== undefined) {
+    const r = Number(defaultRadiusM);
+    if (!Number.isFinite(r) || r < 5 || r > 500) {
+      res.status(400).json({ error: 'Radius must be between 5 and 500 meters' });
+      return;
+    }
+    course.defaultRadiusM = Math.round(r);
+  }
+  await course.save();
+  res.json({ course: await settingsView(course) });
+});
+
+/** Add one student to the roster. */
+coursesRouter.post('/:id/roster', requireRole('lecturer'), async (req, res) => {
+  const course = await findOwnCourse(String(req.params.id), req.auth!.sub);
+  if (!course) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  const { email, firstName, lastName } = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof email !== 'string' || !isEmail(email)) {
+    res.status(400).json({ error: 'Invalid email' });
+    return;
+  }
+  const e = normalizeEmail(email);
+  if (course.roster.some((r) => r.email === e)) {
+    res.status(409).json({ error: 'Student already on roster' });
+    return;
+  }
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim().slice(0, 60) : '');
+  course.roster.push({ email: e, firstName: str(firstName), lastName: str(lastName) });
+  await course.save();
+  res.status(201).json({ course: await settingsView(course) });
+});
+
+/** Remove a student from the roster (their past attendance stays in the database). */
+coursesRouter.delete('/:id/roster/:email', requireRole('lecturer'), async (req, res) => {
+  const course = await findOwnCourse(String(req.params.id), req.auth!.sub);
+  if (!course) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  const e = normalizeEmail(String(req.params.email));
+  const before = course.roster.length;
+  course.set('roster', course.roster.filter((r) => r.email !== e));
+  if (course.roster.length === before) {
+    res.status(404).json({ error: 'Student not on roster' });
+    return;
+  }
+  await course.save();
+  res.json({ course: await settingsView(course) });
+});
+
+/**
+ * Upload a roster file again. `merge` adds new students and updates names; `replace` also removes
+ * students missing from the file.
+ */
+coursesRouter.put('/:id/roster', requireRole('lecturer'), async (req, res) => {
+  const course = await findOwnCourse(String(req.params.id), req.auth!.sub);
+  if (!course) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  const mode = (req.body as { mode?: unknown })?.mode === 'replace' ? 'replace' : 'merge';
+  try {
+    const parsed = await parseUpload(req.body);
+    if (parsed.entries.length === 0) {
+      res.status(400).json({ error: 'No valid emails found in the file' });
+      return;
+    }
+    const existing = new Map(course.roster.map((r) => [r.email, { email: r.email, firstName: r.firstName, lastName: r.lastName }]));
+    const incoming = new Map(parsed.entries.map((r) => [r.email, r]));
+    let added = 0;
+    let updated = 0;
+    for (const [email, r] of incoming) {
+      const old = existing.get(email);
+      if (!old) added++;
+      else if ((r.firstName && r.firstName !== old.firstName) || (r.lastName && r.lastName !== old.lastName)) updated++;
+      existing.set(email, { email, firstName: r.firstName || old?.firstName || '', lastName: r.lastName || old?.lastName || '' });
+    }
+    let removed = 0;
+    if (mode === 'replace') {
+      for (const email of [...existing.keys()]) {
+        if (!incoming.has(email)) {
+          existing.delete(email);
+          removed++;
+        }
+      }
+    }
+    course.set('roster', [...existing.values()]);
+    await course.save();
+    res.json({ added, updated, removed, skipped: parsed.skipped.length, course: await settingsView(course) });
   } catch (e) {
     if (e instanceof HttpError) res.status(e.status).json({ error: e.message });
     else throw e;

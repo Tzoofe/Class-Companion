@@ -84,6 +84,15 @@ function track(job: Promise<unknown>) {
   void job.finally(() => pending.delete(job));
 }
 
+/** Notifies every signed-up student on a course's roster (in the background). */
+export function notifyCourseStudents(course: { roster: { email: string }[] }, payload: PushPayload, ttlSeconds?: number) {
+  const job = (async () => {
+    const students = await User.find({ email: { $in: course.roster.map((r) => r.email) }, role: 'student' }, { _id: 1 });
+    return notifyUsers(students.map((u) => String(u._id)), payload, ttlSeconds);
+  })().catch((e) => console.error('notify failed', e));
+  track(job);
+}
+
 /** Tells the course's (signed-up) students that attendance is open. Runs in the background. */
 export function announceSessionStarted(course: { id: string; name: string; roster: { email: string }[] }) {
   const job = (async () => {

@@ -146,9 +146,19 @@ export default function CourseDashboard() {
   return (
     <div className="space-y-4">
       <div>
-        <Link to="/courses" className="text-sm text-slate-500 hover:underline">
-          → הקורסים שלי
-        </Link>
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <Link to="/courses" className="text-slate-500 hover:underline">
+            → הקורסים שלי
+          </Link>
+          <span className="flex gap-4">
+            <Link to={`/courses/${course.id}/schedule`} className="text-indigo-700 hover:underline">
+              🗓 לוח זמנים
+            </Link>
+            <Link to={`/courses/${course.id}/settings`} className="text-indigo-700 hover:underline">
+              ⚙ הגדרות
+            </Link>
+          </span>
+        </div>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-bold">{course.name}</h1>
           <div className="flex gap-2">

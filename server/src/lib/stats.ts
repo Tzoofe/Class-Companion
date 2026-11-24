@@ -113,8 +113,7 @@ export function buildDashboard({ roster, users, sessions, attendance, now }: Das
             return { email: r.email, firstName: r.firstName, lastName: r.lastName, attended, percent: pct(attended, finished.length)! };
           })
           .filter((s) => s.percent < DASHBOARD.atRiskPercent)
-          .sort((a, b) => a.percent - b.percent || a.lastName.localeCompare(b.lastName, 'he'))
-          .slice(0, DASHBOARD.atRiskLimit);
+          .sort((a, b) => a.percent - b.percent || a.lastName.localeCompare(b.lastName, 'he'));
 
   const last = history.at(-1) ?? null;
   return {
@@ -126,7 +125,8 @@ export function buildDashboard({ roster, users, sessions, attendance, now }: Das
     lastSession: last,
     live: active ? { id: active.id, endsAt: active.endsAt, present: presentBySession.get(active.id) ?? 0 } : null,
     history: history.slice(-DASHBOARD.chartSessions),
-    atRisk,
+    atRisk: atRisk.slice(0, DASHBOARD.atRiskLimit),
+    atRiskCount: atRisk.length,
     atRiskThreshold: DASHBOARD.atRiskPercent,
   };
 }

@@ -6,7 +6,9 @@ import AuthForm from './pages/AuthForm';
 import CourseDashboard from './pages/CourseDashboard';
 import CourseFeed from './pages/CourseFeed';
 import CoursePolls from './pages/CoursePolls';
+import CourseSchedulePage from './pages/CourseSchedulePage';
 import CourseSessions from './pages/CourseSessions';
+import CourseSettings from './pages/CourseSettings';
 import CourseStudents from './pages/CourseStudents';
 import Courses from './pages/Courses';
 import LecturerAttendance from './pages/LecturerAttendance';
@@ -41,6 +43,8 @@ export default function App() {
               <Route path="/courses/:id" element={<CourseDashboard />} />
               <Route path="/courses/:id/students" element={<CourseStudents />} />
               <Route path="/courses/:id/sessions" element={<CourseSessions />} />
+              <Route path="/courses/:id/settings" element={<CourseSettings />} />
+              <Route path="/courses/:id/schedule" element={<CourseSchedulePage />} />
               <Route path="/courses/:id/sessions/:sessionId" element={<SessionDetail />} />
               <Route path="/courses/:id/attendance" element={<LecturerAttendance />} />
             </Route>
