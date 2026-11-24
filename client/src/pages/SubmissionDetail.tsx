@@ -96,7 +96,7 @@ export default function SubmissionDetail() {
         <button type="button" onClick={() => downloadFile(`/submissions/${sid}/file`, s.fileName).catch((e) => setError(e.message))} className={ghostButton}>
           הורדת הקובץ המקורי
         </button>
-        {!busy && (
+        {!busy && s.review.status !== 'skipped' && (
           <button type="button" onClick={() => api(`/submissions/${sid}/review`, { method: 'POST' }).then(load, (e) => setError(e.message))} className={ghostButton}>
             בדיקת AI מחדש
           </button>
@@ -166,7 +166,7 @@ export default function SubmissionDetail() {
 
       <section className="tile p-6">
         <h2 className="mb-4 text-lg">הקבצים שהוגשו</h2>
-        <Contents contents={data.contents} />
+        {data.contents.length ? <Contents contents={data.contents} /> : <p className="text-ink-2">אין טקסט שאפשר להציג (PDF סרוק או צילום). הורידו את הקובץ המקורי כדי לראות אותו.</p>}
       </section>
     </div>
   );

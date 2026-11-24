@@ -32,6 +32,7 @@ const submittedText = (s: SubmissionView) => `${new Date(s.submittedAt).toLocale
 /** AI feedback per criterion; with `shares`, how the (anonymous) class did on each one. */
 export function ReviewPanel({ review, criteria, shares, showPoints }: { review: ReviewView; criteria: Criterion[]; shares?: Record<string, number> | null; showPoints?: boolean }) {
   if (reviewBusy(review)) return <p className="text-ink-2">ה-AI בודק את ההגשה… זה לוקח דקה או שתיים, אפשר לסגור את הדף.</p>;
+  if (review.status === 'skipped') return <p className="text-ink-2">ההגשה התקבלה. ב-PDF אין טקסט שאפשר לקרוא (למשל סריקה או צילום), ולכן אין משוב אוטומטי. המרצה יבדוק את הקובץ עצמו.</p>;
   if (review.status === 'failed') return <p className="text-bad">הבדיקה האוטומטית נכשלה{review.error ? ` (${review.error})` : ''}.</p>;
   return (
     <div className="space-y-5">
@@ -425,6 +426,8 @@ function LecturerView({ data, reload }: { data: LecturerAssignmentDetail; reload
                       <span className="text-ink-3">בבדיקת AI…</span>
                     ) : s.review.status === 'failed' ? (
                       <span className="text-bad">הבדיקה נכשלה</span>
+                    ) : s.review.status === 'skipped' ? (
+                      <span className="text-ink-3">סרוק, לבדיקה ידנית</span>
                     ) : (
                       <span className="text-ink-3">מוצע {s.suggestedPoints ?? '—'}, לבדיקה</span>
                     )}

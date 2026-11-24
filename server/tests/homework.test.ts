@@ -10,8 +10,9 @@ describe('extractSubmission', () => {
     expect(files).toEqual([{ path: 'hw1.pdf', text: expect.stringContaining('base case'), code: false }]);
   });
 
-  it('rejects PDFs without text (scans) and unsupported types', async () => {
-    await expect(extractSubmission('scan.pdf', makePdf(''))).rejects.toThrow('No readable text in the PDF');
+  it('accepts any PDF (no text → no files), rejects unsupported types', async () => {
+    expect(await extractSubmission('scan.pdf', makePdf(''))).toEqual([]);
+    expect(await extractSubmission('broken.pdf', Buffer.from('%PDF-1.4 garbage'))).toEqual([]);
     await expect(extractSubmission('x.docx', Buffer.from('x'))).rejects.toThrow('Unsupported file type');
     await expect(extractSubmission('bad.zip', Buffer.from('not a zip'))).rejects.toThrow('Could not open the ZIP file');
   });

@@ -57,7 +57,7 @@ const submissionSchema = new Schema(
     /** How late the final submission was, in ms (0 = on time). */
     lateMs: { type: Number, default: 0 },
     review: {
-      status: { type: String, enum: ['queued', 'running', 'done', 'failed'], default: 'queued' },
+      status: { type: String, enum: ['queued', 'running', 'done', 'failed', 'skipped'], default: 'queued' },
       error: { type: String, default: '' },
       summary: { type: String, default: '' },
       approach: { type: String, default: '' },

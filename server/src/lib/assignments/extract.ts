@@ -30,7 +30,7 @@ export async function pdfText(data: Uint8Array): Promise<string> {
     const { text } = await extractText(data, { mergePages: true });
     return text.replace(/[ \t]+\n/g, '\n').trim();
   } catch {
-    throw new ExtractError('Could not read the PDF');
+    return ''; // scanned, encrypted or unusual PDFs are still accepted; there's just no text to review
   }
 }
 
@@ -106,7 +106,8 @@ export async function extractSubmission(fileName: string, data: Buffer): Promise
     throw new ExtractError('Unsupported file type');
   }
   files = files.filter((f) => f.text.trim());
-  if (!files.length) throw new ExtractError(ext === '.pdf' ? 'No readable text in the PDF (is it scanned?)' : 'No readable files in the ZIP');
+  // Any PDF is accepted: without text (a scan or a photo) it's stored for the lecturer, and the AI review is skipped.
+  if (!files.length && ext !== '.pdf') throw new ExtractError('No readable files in the ZIP');
 
   // Keep the total bounded; the shortest files first so every file is represented.
   let budget: number = SUBMISSION_LIMITS.totalChars;

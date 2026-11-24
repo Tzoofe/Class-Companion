@@ -1,6 +1,7 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { assignmentsRouter } from './routes/assignments.js';
 import { authRouter } from './routes/auth.js';
+import { joinRouter } from './routes/join.js';
 import { coursesRouter } from './routes/courses.js';
 import { overviewRouter } from './routes/overview.js';
 import { pollsRouter } from './routes/polls.js';
@@ -18,6 +19,7 @@ export function createApp() {
     res.json({ ok: true });
   });
   app.use('/api/auth', authRouter);
+  app.use('/api', joinRouter); // before coursesRouter: /courses/demo
   app.use('/api/courses', coursesRouter);
   app.use('/api/sessions', sessionsRouter);
   app.use('/api/push', pushRouter);

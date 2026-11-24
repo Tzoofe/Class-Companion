@@ -130,6 +130,8 @@ async function settingsView(course: NonNullable<Awaited<ReturnType<typeof findOw
     name: course.name,
     defaultRadiusM: course.defaultRadiusM,
     attendanceRequired: course.attendanceRequired !== false,
+    joinOpen: course.joinOpen === true,
+    joinCode: course.joinCode ?? null,
     roster: course.roster
       .map((r) => ({ email: r.email, firstName: r.firstName, lastName: r.lastName, registered: registered.has(r.email) }))
       .sort((a, b) => collator.compare(a.lastName, b.lastName) || collator.compare(a.firstName, b.firstName)),

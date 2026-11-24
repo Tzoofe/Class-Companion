@@ -8,6 +8,8 @@ interface AuthState {
   login: (email: string, password: string) => Promise<User>;
   signup: (email: string, password: string) => Promise<User>;
   logout: () => void;
+  /** Sign in with a token obtained elsewhere (e.g. joining a course with its link). */
+  acceptSession: (token: string, user: User) => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -36,6 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     login: (e, p) => authenticate('/auth/login', e, p),
     signup: (e, p) => authenticate('/auth/signup', e, p),
+    acceptSession: (token, u) => {
+      tokenStore.set(token);
+      setUser(u);
+    },
     logout: () => {
       // Stop notifications for this account on this device (best effort, needs the token, so before clearing it).
       void disablePush().catch(() => {});

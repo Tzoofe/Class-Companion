@@ -197,6 +197,12 @@ function enqueueReview(submissionId: string) {
     const a = await Assignment.findById(s.assignmentId);
     if (!a) return;
     const files = s.files.map((f) => ({ path: f.path ?? '', text: f.text ?? '', code: !!f.code }));
+    if (!files.length) {
+      // A PDF with no text (scanned / photographed): nothing for the AI to read; the lecturer checks the file.
+      s.set({ 'review.status': 'skipped', 'review.error': '' });
+      await s.save();
+      return;
+    }
     const code = isCodeSubmission(files);
     s.set({ 'review.status': 'running', 'review.error': '' });
     await s.save();
@@ -338,7 +344,7 @@ assignmentsRouter.get('/assignments/:aid', requireAuth, async (req, res) => {
     assignment: assignmentBase(a),
     final: final ? submissionView(final, { lecturer: false, gradesReleased: a.gradesReleased }) : null,
     practice: practice.map((s) => submissionView(s, { lecturer: false, gradesReleased: false })),
-    practiceLeft: Math.max(0, a.practiceLimit - practice.length),
+    practiceLeft: Math.max(0, a.practiceLimit - practice.filter((p) => p.review?.status !== 'skipped').length),
     classShares: me ? await classShares(a, me.email) : null,
     comparisonOpen: a.dueAt.getTime() <= Date.now(),
     gradeStats: a.gradesReleased ? await gradeStatsFor(a) : null,
@@ -539,7 +545,7 @@ assignmentsRouter.post('/assignments/:aid/submissions', requireAuth, requireRole
     return;
   }
   if (kind === 'practice') {
-    const used = await Submission.countDocuments({ assignmentId: a._id, email: me.email, kind: 'practice' });
+    const used = await Submission.countDocuments({ assignmentId: a._id, email: me.email, kind: 'practice', 'review.status': { $ne: 'skipped' } });
     if (used >= a.practiceLimit) {
       res.status(409).json({ error: 'No practice reviews left', limit: a.practiceLimit });
       return;

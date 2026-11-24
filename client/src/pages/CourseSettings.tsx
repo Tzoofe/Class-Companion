@@ -55,6 +55,49 @@ function DetailsForm({ course, onSaved }: { course: Settings; onSaved: (c: Setti
   );
 }
 
+/** Join link / QR: anyone with the code can add themselves to the roster while it's on. */
+function JoinLink({ course, onChange }: { course: Settings; onChange: (c: Settings) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function set(body: { open?: boolean; regenerate?: boolean }) {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await api<{ joinCode: string | null; joinOpen: boolean }>(`/courses/${course.id}/join`, { method: 'POST', json: body });
+      onChange({ ...course, ...r });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className={card}>
+      <h2>קישור הצטרפות</h2>
+      <Toggle
+        checked={course.joinOpen}
+        onChange={(v) => !busy && set({ open: v })}
+        label="סטודנטים יכולים להצטרף בעצמם"
+        hint={course.joinOpen ? 'מי שסורק את הקוד או נכנס לקישור מצטרף לרשימת הסטודנטים, עם כל כתובת מייל.' : 'כבוי: רק מי שברשימה שהעליתם נמצא בקורס.'}
+      />
+      {course.joinOpen && course.joinCode && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <span className="font-display text-2xl tracking-[0.15em]" dir="ltr">
+            {course.joinCode}
+          </span>
+          <Link to={`/courses/${course.id}/demo`} className="text-ink-2 underline decoration-line-strong underline-offset-4 hover:text-ink">
+            הצגת הקוד במסך מלא
+          </Link>
+          <button type="button" disabled={busy} onClick={() => set({ regenerate: true })} className="text-ink-3 underline decoration-line-strong underline-offset-4 hover:text-ink">
+            קוד חדש (הישן יפסיק לעבוד)
+          </button>
+        </div>
+      )}
+      <ErrorBox>{error}</ErrorBox>
+    </div>
+  );
+}
+
 function AddStudent({ courseId, onSaved }: { courseId: string; onSaved: (c: Settings) => void }) {
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -185,6 +228,7 @@ export default function CourseSettings() {
       </div>
 
       <DetailsForm course={course} onSaved={setCourse} />
+      <JoinLink course={course} onChange={setCourse} />
 
       <section className={card}>
         <div className="flex items-baseline justify-between">

@@ -5,6 +5,8 @@ const rosterEntrySchema = new Schema(
     email: { type: String, required: true, lowercase: true, trim: true },
     firstName: { type: String, default: '' },
     lastName: { type: String, default: '' },
+    /** Set when the student added themselves with the course's join link. */
+    joinedAt: { type: Date },
   },
   { _id: false },
 );
@@ -31,6 +33,11 @@ const courseSchema = new Schema(
     defaultRadiusM: { type: Number, default: 20, min: 5, max: 500 },
     /** Mandatory attendance: only then are students under the threshold flagged. */
     attendanceRequired: { type: Boolean, default: true },
+    /** Join link / QR: anyone with the code can add themselves to the roster while joinOpen. */
+    joinCode: { type: String },
+    joinOpen: { type: Boolean, default: false },
+    /** Created with "demo course" (shown as such in the UI). */
+    demo: { type: Boolean, default: false },
     schedule: { type: [slotSchema], default: [] },
     /** "YYYY-MM-DD"; weekly slots repeat only between these dates (when set). */
     semesterStart: { type: String },
@@ -39,5 +46,6 @@ const courseSchema = new Schema(
   { timestamps: true },
 );
 courseSchema.index({ 'roster.email': 1 });
+courseSchema.index({ joinCode: 1 }, { unique: true, partialFilterExpression: { joinCode: { $type: 'string' } } });
 
 export const Course = model('Course', courseSchema);

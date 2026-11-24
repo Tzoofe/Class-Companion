@@ -16,6 +16,8 @@ import CourseSummaries from './pages/CourseSummaries';
 import Courses from './pages/Courses';
 import LecturerAttendance from './pages/LecturerAttendance';
 import DebugLocation from './pages/DebugLocation';
+import DemoScreen from './pages/DemoScreen';
+import JoinCourse from './pages/JoinCourse';
 import FeedPresent from './pages/FeedPresent';
 import NewCourse from './pages/NewCourse';
 import PollPresent from './pages/PollPresent';
@@ -31,10 +33,12 @@ export default function App() {
         <Route path="/login" element={<AuthForm mode="login" />} />
         <Route path="/signup" element={<AuthForm mode="signup" />} />
         <Route path="/debug/location" element={<DebugLocation />} />
+        <Route path="/join/:code" element={<JoinCourse />} />
         <Route element={<RequireAuth />}>
           <Route element={<RequireAuth role="lecturer" />}>
             <Route path="/courses/:id/feed/present" element={<FeedPresent />} />
             <Route path="/courses/:id/polls/present" element={<PollPresent />} />
+            <Route path="/courses/:id/demo" element={<DemoScreen />} />
           </Route>
           <Route element={<Layout />}>
             <Route path="/courses" element={<Courses />} />

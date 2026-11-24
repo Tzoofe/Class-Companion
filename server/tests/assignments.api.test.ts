@@ -141,8 +141,24 @@ describe('assignments', () => {
     const { students, create, submit } = await setup(1);
     const a = (await create({ dueAt: future(), publish: true })).body.assignment;
     expect((await submit(students[0], a.id, 'final', 'hw.docx', Buffer.from('x'))).body.error).toBe('Upload a PDF or ZIP file');
-    expect((await submit(students[0], a.id, 'final', 'scan.pdf', makePdf(''))).body.error).toBe('No readable text in the PDF (is it scanned?)');
     expect((await submit(students[0], a.id, 'final', 'empty.pdf', Buffer.alloc(0))).body.error).toBe('The file is empty');
+  });
+
+  it('accepts scanned PDFs: stored for the lecturer, AI review skipped, no practice review used', async () => {
+    const { students, create, submit, lect } = await setup(1);
+    const a = (await create({ dueAt: future(), publish: true, practiceLimit: 1 })).body.assignment;
+    const final = await submit(students[0], a.id, 'final', 'scan.pdf', makePdf(''));
+    expect(final.status).toBe(201);
+    await submit(students[0], a.id, 'practice', 'scan.pdf', makePdf(''));
+    await settleJobs();
+    const mine = (await api().get(`/api/assignments/${a.id}`).set(students[0])).body;
+    expect(mine.final.review.status).toBe('skipped');
+    expect(mine.practice[0].review.status).toBe('skipped');
+    expect(mine.practiceLeft).toBe(1);
+    const detail = await api().get(`/api/submissions/${final.body.submission.id}`).set(lect);
+    expect(detail.body.contents).toEqual([]);
+    expect((await api().get(`/api/submissions/${final.body.submission.id}/file`).set(lect)).status).toBe(200);
+    expect((await api().put(`/api/submissions/${final.body.submission.id}/grade`).set(lect).send({ points: 80 })).status).toBe(200);
   });
 
   it('grades, releases grades (notifying graded students), and students see them only after release', async () => {

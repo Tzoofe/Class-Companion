@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, type Agenda, type AgendaItem, type LecturerOverview, type LessonRecap, type StudentCourse } from '../api';
 import { useAuth } from '../auth';
 import { KIND_HE, LinkButton, dayLabel, timing } from '../components/AgendaList';
@@ -246,6 +246,30 @@ function ActionRow({ to, title, detail, warn }: { to: string; title: string; det
   );
 }
 
+/** One click: an empty demo course with a join QR, then straight to the demo screen. */
+function DemoCourseButton() {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const r = await api<{ course: { id: string } }>('/courses/demo', { method: 'POST' });
+          navigate(`/courses/${r.course.id}/demo`);
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="text-ink-2 underline decoration-line-strong underline-offset-4 hover:text-ink disabled:opacity-50"
+    >
+      {busy ? '…' : 'קורס הדגמה'}
+    </button>
+  );
+}
+
 function LecturerHome() {
   const { data: overview, error } = useLive<LecturerOverview>('/me/overview');
   const { data: agenda } = useLive<Agenda>('/me/agenda?days=7');
@@ -315,7 +339,16 @@ function LecturerHome() {
           )}
         </Tile>
 
-        <Tile size="wide" title="הקורסים שלי" action={<TextLink to="/courses/new">קורס חדש</TextLink>}>
+        <Tile
+          size="wide"
+          title="הקורסים שלי"
+          action={
+            <span className="flex gap-4">
+              <DemoCourseButton />
+              <TextLink to="/courses/new">קורס חדש</TextLink>
+            </span>
+          }
+        >
           {overview.courses.length === 0 ? (
             <p className="text-ink-2">עדיין אין קורסים.</p>
           ) : (

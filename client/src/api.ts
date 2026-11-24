@@ -79,8 +79,12 @@ const HEBREW_ERRORS: Record<string, string> = {
   'Event not found': 'האירוע לא נמצא',
   'Student already on roster': 'הסטודנט/ית כבר ברשימה',
   'Invalid setting': 'הגדרה לא תקינה',
+  'Join link not found or closed': 'קישור ההצטרפות לא נמצא או שנסגר',
+  'First name is required': 'יש להזין שם פרטי',
+  'This email already has an account': 'למייל הזה כבר יש חשבון. הזינו את הסיסמה שלו',
+  'Lecturer accounts cannot join as students': 'חשבון מרצה לא יכול להצטרף כסטודנט/ית',
+  'The course is full': 'הקורס מלא',
   'Upload a PDF or ZIP file': 'אפשר להגיש קובץ PDF או ZIP',
-  'No readable text in the PDF (is it scanned?)': 'לא נמצא טקסט ב-PDF. אם הוא סרוק, הגישו גרסה שנוצרה מהמחשב',
   'No readable files in the ZIP': 'לא נמצאו קבצי קוד או טקסט ב-ZIP',
   'Could not read the PDF': 'לא ניתן לקרוא את קובץ ה-PDF',
   'Could not open the ZIP file': 'לא ניתן לפתוח את קובץ ה-ZIP',
@@ -411,6 +415,8 @@ export interface CourseSettings {
   name: string;
   defaultRadiusM: number;
   attendanceRequired: boolean;
+  joinOpen: boolean;
+  joinCode: string | null;
   roster: RosterMember[];
 }
 
@@ -603,7 +609,7 @@ export interface AssignmentBase {
 export type Met = 'yes' | 'partial' | 'no' | 'unknown';
 
 export interface ReviewView {
-  status: 'queued' | 'running' | 'done' | 'failed';
+  status: 'queued' | 'running' | 'done' | 'failed' | 'skipped';
   error: string;
   summary: string;
   strengths: string[];
@@ -672,3 +678,19 @@ export function lateText(ms: number): string {
   if (h < 48) return `${Math.round(h)} שעות`;
   return `${Math.round(h / 24)} ימים`;
 }
+
+// ── Join link ──
+
+export interface JoinInfo {
+  course: { id: string; name: string; lecturerName: string; demo: boolean };
+}
+
+export interface JoinStatus {
+  course: { id: string; name: string; demo: boolean };
+  joinCode: string | null;
+  joinOpen: boolean;
+  rosterCount: number;
+  joined: { firstName: string; lastName: string; joinedAt: string }[];
+}
+
+export const joinUrl = (code: string) => `${window.location.origin}/join/${code}`;

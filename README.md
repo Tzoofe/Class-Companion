@@ -227,3 +227,13 @@ shared/       geo.ts — Haversine distance, single implementation for client an
 samples/      example roster files
 docs/         PHONE_TESTING.md
 ```
+
+## Demo mode
+
+- **"קורס הדגמה"** on the lecturer home creates an empty course with a lesson happening now and opens the
+  demo screen: a big QR code + 6-character code, people appearing as they join, and one-click steps for each
+  feature (attendance, a quick poll, questions, a demo assignment, lesson summary, dashboard and export).
+- **Join link** (`/join/<code>`): name + email, no account needed; the person is signed in on their phone and
+  added to the roster. Any email domain works here. An email that already has an account needs that account's
+  password. Any course can turn its join link on or off (and get a new code) in course settings.
+- Open the demo screen on the public (Tailscale) address, so the QR code points somewhere phones can reach.

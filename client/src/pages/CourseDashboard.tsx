@@ -164,6 +164,7 @@ export default function CourseDashboard() {
                 <Link to={`/courses/${course.id}/assignments`} className={menuLink}>מטלות</Link>
                 <Link to={`/courses/${course.id}/feed/present`} className={menuLink}>מסך הקרנה: שאלות</Link>
                 <Link to={`/courses/${course.id}/polls/present`} className={menuLink}>מסך הקרנה: סקר</Link>
+                <Link to={`/courses/${course.id}/demo`} className={menuLink}>מסך הצטרפות (QR) והדגמה</Link>
                 <Link to={`/courses/${course.id}/settings`} className={menuLink}>הגדרות הקורס</Link>
               </div>
             </details>
