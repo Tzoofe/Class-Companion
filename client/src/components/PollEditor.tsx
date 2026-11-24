@@ -102,14 +102,14 @@ export default function PollEditor({
   const presentNeedsSession = d.audience === 'present' && !sessionActive;
 
   return (
-    <form onSubmit={(e) => submit(!!submitLabels.open, e)} className="space-y-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-      <div className="flex flex-wrap gap-1 rounded-lg bg-slate-100 p-0.5 text-sm">
+    <form onSubmit={(e) => submit(!!submitLabels.open, e)} className="space-y-4 card p-4">
+      <div className="flex flex-wrap gap-1 rounded-xl bg-surface-2 p-0.5 text-sm">
         {TYPES.map(([t, label]) => (
           <button
             key={t}
             type="button"
             onClick={() => setType(t)}
-            className={`flex-1 rounded-md px-3 py-1.5 ${d.type === t ? 'bg-white font-medium shadow-sm' : 'text-slate-600'}`}
+            className={`flex-1 rounded-md px-3 py-1.5 ${d.type === t ? 'bg-surface-2 font-medium ' : 'text-ink-2'}`}
           >
             {label}
           </button>
@@ -121,7 +121,7 @@ export default function PollEditor({
         onChange={(e) => set({ question: e.target.value.slice(0, 300) })}
         rows={2}
         placeholder={d.type === 'scale' ? 'למשל: עד כמה הנושא ברור לכם?' : d.type === 'text' ? 'למשל: מה הדבר הכי לא ברור בנושא?' : 'השאלה'}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+        className="w-full rounded-xl border border-line-strong px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
       />
 
       {d.type === 'choice' && (
@@ -133,7 +133,7 @@ export default function PollEditor({
                 onClick={() => toggleCorrect(i)}
                 title="סימון כתשובה נכונה"
                 aria-pressed={d.correct.includes(i)}
-                className={`h-8 w-8 shrink-0 rounded-full text-sm ring-1 ${d.correct.includes(i) ? 'bg-emerald-600 text-white ring-emerald-600' : 'text-slate-400 ring-slate-300 hover:bg-slate-50'}`}
+                className={`h-8 w-8 shrink-0 rounded-full text-sm ring-1 ${d.correct.includes(i) ? 'bg-good-strong text-white ring-good-strong' : 'text-ink-4 ring-line-strong hover:bg-surface'}`}
               >
                 ✓
               </button>
@@ -141,21 +141,21 @@ export default function PollEditor({
                 value={o}
                 onChange={(e) => set({ options: d.options.map((x, j) => (j === i ? e.target.value.slice(0, 120) : x)) })}
                 placeholder={`אפשרות ${i + 1}`}
-                className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                className="min-w-0 flex-1 rounded-xl border border-line-strong px-3 py-2 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
               />
               {d.options.length > 2 && (
-                <button type="button" onClick={() => removeOption(i)} className="shrink-0 px-2 text-slate-400 hover:text-red-600" aria-label="הסרת אפשרות">
+                <button type="button" onClick={() => removeOption(i)} className="shrink-0 px-2 text-ink-4 hover:text-bad" aria-label="הסרת אפשרות">
                   ✕
                 </button>
               )}
             </div>
           ))}
           {d.options.length < MAX_OPTIONS && (
-            <button type="button" onClick={() => set({ options: [...d.options, ''] })} className="text-sm text-indigo-700 hover:underline">
+            <button type="button" onClick={() => set({ options: [...d.options, ''] })} className="text-sm text-accent-ink hover:underline">
               + אפשרות
             </button>
           )}
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-ink-2">
             <input
               type="checkbox"
               checked={d.multiple}
@@ -164,20 +164,20 @@ export default function PollEditor({
             />
             אפשר לבחור כמה תשובות
           </label>
-          <p className="text-xs text-slate-500">סימון ✓ ליד אפשרות = תשובה נכונה (לא חובה). היא תוצג לסטודנטים רק כשתציגו את התוצאות.</p>
+          <p className="text-xs text-ink-3">סימון ✓ ליד אפשרות = תשובה נכונה (לא חובה). היא תוצג לסטודנטים רק כשתציגו את התוצאות.</p>
         </div>
       )}
 
       {d.type === 'yesno' && (
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-slate-600">תשובה נכונה (לא חובה):</span>
+          <span className="text-ink-2">תשובה נכונה (לא חובה):</span>
           {(['yes', 'no'] as const).map((c) => (
             <button
               key={c}
               type="button"
               onClick={() => toggleCorrect(c)}
               aria-pressed={d.correct.includes(c)}
-              className={`rounded-full px-3 py-1 ring-1 ${d.correct.includes(c) ? 'bg-emerald-600 text-white ring-emerald-600' : 'ring-slate-300'}`}
+              className={`rounded-full px-3 py-1 ring-1 ${d.correct.includes(c) ? 'bg-good-strong text-white ring-good-strong' : 'ring-line-strong'}`}
             >
               {c === 'yes' ? 'כן' : 'לא'}
             </button>
@@ -186,14 +186,14 @@ export default function PollEditor({
       )}
 
       {d.type === 'text' && (
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-ink-2">
           <input type="checkbox" checked={d.showTextOnScreen} onChange={(e) => set({ showTextOnScreen: e.target.checked })} className="h-4 w-4" />
           להציג את התשובות במסך ההקרנה
         </label>
       )}
 
       <fieldset className="space-y-1.5 text-sm">
-        <legend className="mb-1 font-medium text-slate-700">מי יכול לענות?</legend>
+        <legend className="mb-1 font-medium text-ink-2">מי יכול לענות?</legend>
         <label className="flex items-center gap-2">
           <input type="radio" name="audience" checked={d.audience === 'roster'} onChange={() => set({ audience: 'roster' })} />
           כל הסטודנטים בקורס
@@ -202,13 +202,13 @@ export default function PollEditor({
           <input type="radio" name="audience" checked={d.audience === 'present'} onChange={() => set({ audience: 'present' })} />
           רק מי שנוכח/ת בשיעור (סימן/ה נוכחות במפגש הפתוח)
         </label>
-        {presentNeedsSession && <p className="text-xs text-amber-700">כדי לפתוח סקר כזה צריך שהנוכחות תהיה פתוחה.</p>}
+        {presentNeedsSession && <p className="text-xs text-warn">כדי לפתוח סקר כזה צריך שהנוכחות תהיה פתוחה.</p>}
       </fieldset>
 
       <ErrorBox>{error}</ErrorBox>
       <div className="flex flex-wrap gap-2">
         {submitLabels.open && (
-          <button type="submit" disabled={busy || presentNeedsSession} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+          <button type="submit" disabled={busy || presentNeedsSession} className="btn-primary rounded-full px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50">
             {busy ? '…' : submitLabels.open}
           </button>
         )}
@@ -216,12 +216,12 @@ export default function PollEditor({
           type="button"
           disabled={busy}
           onClick={() => submit(false)}
-          className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-50"
+          className="rounded-full bg-surface-2 px-4 py-2 text-sm font-medium text-ink ring-1 ring-line hover:bg-surface-3 disabled:opacity-50"
         >
           {submitLabels.save}
         </button>
         {onCancel && (
-          <button type="button" onClick={onCancel} className="px-3 py-2 text-sm text-slate-600">
+          <button type="button" onClick={onCancel} className="px-3 py-2 text-sm text-ink-2">
             ביטול
           </button>
         )}

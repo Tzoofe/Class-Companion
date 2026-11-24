@@ -8,15 +8,15 @@ const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('he-IL', { hour
 function How({ s }: { s: SessionRosterRow }) {
   if (s.present && s.source === 'gps')
     return (
-      <span className="text-xs text-slate-500">
+      <span className="text-xs text-ink-3">
         GPS{s.distanceM !== null && ` · ${Math.round(s.distanceM)} מ׳`}
         {s.accuracyM !== null && ` (±${Math.round(s.accuracyM)})`}
         {s.checkedInAt && ` · ${timeOf(s.checkedInAt)}`}
       </span>
     );
-  if (s.present) return <span className="text-xs text-indigo-700">סומן ידנית</span>;
-  if (s.markedAbsent) return <span className="text-xs text-amber-700">סומן/ה כלא נוכח/ת</span>;
-  if (!s.registered) return <span className="text-xs text-slate-400">לא נרשם/ה לאפליקציה</span>;
+  if (s.present) return <span className="text-xs text-accent-ink">סומן ידנית</span>;
+  if (s.markedAbsent) return <span className="text-xs text-warn">סומן/ה כלא נוכח/ת</span>;
+  if (!s.registered) return <span className="text-xs text-ink-4">לא נרשם/ה לאפליקציה</span>;
   return null;
 }
 
@@ -88,29 +88,29 @@ export default function SessionRoster({ sessionId, live, onSummary }: { sessionI
     return q ? all.filter((s) => `${s.firstName} ${s.lastName} ${s.lastName} ${s.firstName} ${s.email}`.toLowerCase().includes(q)) : all;
   }, [data, query]);
 
-  if (!data) return <p className="text-center text-sm text-slate-500">{error || 'טוען רשימה…'}</p>;
+  if (!data) return <p className="text-center text-sm text-ink-3">{error || 'טוען רשימה…'}</p>;
   const presentCount = data.students.filter((s) => s.present).length;
 
   return (
     <section className="space-y-3 text-start">
       <div className="flex items-baseline justify-between">
-        <h2 className="font-semibold">סטודנטים</h2>
-        <span className="text-sm tabular-nums text-slate-500">
+        <h2 className="">סטודנטים</h2>
+        <span className="text-sm tabular-nums text-ink-3">
           {presentCount}/{data.students.length} נוכחים
         </span>
       </div>
       {data.session.status === 'closed' && (
-        <p className="rounded-lg bg-slate-100 p-2.5 text-sm text-slate-700">המפגש נסגר — עדיין אפשר לסמן ולתקן נוכחות ידנית.</p>
+        <p className="rounded-xl bg-surface-2 p-2.5 text-sm text-ink-2">המפגש נסגר — עדיין אפשר לסמן ולתקן נוכחות ידנית.</p>
       )}
       <input
         type="search"
         placeholder="חיפוש לפי שם או אימייל"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+        className="w-full rounded-xl border border-line-strong bg-surface-2 px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
       />
       <ErrorBox>{error}</ErrorBox>
-      <ul className="divide-y divide-slate-100 rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+      <ul className="divide-y divide-line card">
         {students.map((s) => {
           const busy = saving.has(s.email.toLowerCase());
           return (
@@ -129,7 +129,7 @@ export default function SessionRoster({ sessionId, live, onSummary }: { sessionI
                 disabled={busy}
                 onClick={() => toggle(s)}
                 className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 ${
-                  s.present ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-100 text-slate-600 ring-1 ring-slate-300 hover:bg-slate-200'
+                  s.present ? 'bg-good-strong text-white hover:bg-good-strong' : 'bg-surface-2 text-ink-2 ring-1 ring-line-strong hover:bg-surface-3'
                 }`}
               >
                 {s.present ? '✓ נוכח/ת' : 'לא נוכח/ת'}
@@ -137,10 +137,10 @@ export default function SessionRoster({ sessionId, live, onSummary }: { sessionI
             </li>
           );
         })}
-        {students.length === 0 && <li className="px-3 py-6 text-center text-sm text-slate-500">לא נמצאו סטודנטים</li>}
+        {students.length === 0 && <li className="px-3 py-6 text-center text-sm text-ink-3">לא נמצאו סטודנטים</li>}
       </ul>
       {!data.students.some((s) => s.present) && (
-        <p className="text-xs text-slate-500">לחצו על סטודנט/ית כדי לסמן נוכחות ידנית. סטודנטים שסימנו ב-GPS יופיעו כאן אוטומטית.</p>
+        <p className="text-xs text-ink-3">לחצו על סטודנט/ית כדי לסמן נוכחות ידנית. סטודנטים שסימנו ב-GPS יופיעו כאן אוטומטית.</p>
       )}
     </section>
   );

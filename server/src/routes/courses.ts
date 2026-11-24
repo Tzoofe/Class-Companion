@@ -35,6 +35,7 @@ coursesRouter.get('/', async (req, res) => {
         name: c.name,
         rosterCount: c.roster.length,
         defaultRadiusM: c.defaultRadiusM,
+        attendanceRequired: c.attendanceRequired !== false,
       })),
     });
     return;
@@ -100,8 +101,9 @@ coursesRouter.post('/', requireRole('lecturer'), async (req, res) => {
       res.status(400).json({ error: 'No valid emails found in the file' });
       return;
     }
-    const course = await Course.create({ name, lecturerId: req.auth!.sub, roster: parsed.entries, defaultRadiusM: radius });
-    res.status(201).json({ course: { id: course.id, name: course.name, rosterCount: course.roster.length, defaultRadiusM: radius } });
+    const attendanceRequired = req.body?.attendanceRequired !== false;
+    const course = await Course.create({ name, lecturerId: req.auth!.sub, roster: parsed.entries, defaultRadiusM: radius, attendanceRequired });
+    res.status(201).json({ course: { id: course.id, name: course.name, rosterCount: course.roster.length, defaultRadiusM: radius, attendanceRequired } });
   } catch (e) {
     if (e instanceof HttpError) res.status(e.status).json({ error: e.message });
     else throw e;
@@ -126,6 +128,7 @@ async function settingsView(course: NonNullable<Awaited<ReturnType<typeof findOw
     id: course.id as string,
     name: course.name,
     defaultRadiusM: course.defaultRadiusM,
+    attendanceRequired: course.attendanceRequired !== false,
     roster: course.roster
       .map((r) => ({ email: r.email, firstName: r.firstName, lastName: r.lastName, registered: registered.has(r.email) }))
       .sort((a, b) => collator.compare(a.lastName, b.lastName) || collator.compare(a.firstName, b.firstName)),
@@ -139,7 +142,12 @@ coursesRouter.patch('/:id', requireRole('lecturer'), async (req, res) => {
     res.status(404).json({ error: 'Course not found' });
     return;
   }
-  const { name, defaultRadiusM } = (req.body ?? {}) as Record<string, unknown>;
+  const { name, defaultRadiusM, attendanceRequired } = (req.body ?? {}) as Record<string, unknown>;
+  if (attendanceRequired !== undefined && typeof attendanceRequired !== 'boolean') {
+    res.status(400).json({ error: 'Invalid setting' });
+    return;
+  }
+  if (typeof attendanceRequired === 'boolean') course.attendanceRequired = attendanceRequired;
   if (name !== undefined) {
     if (typeof name !== 'string' || !name.trim()) {
       res.status(400).json({ error: 'Course name is required' });
@@ -298,13 +306,14 @@ coursesRouter.get('/:id/dashboard', requireRole('lecturer'), async (req, res) =>
     User.find({ email: { $in: emails } }, { email: 1 }),
     Session.find({ courseId: course._id }, { status: 1, startsAt: 1, endsAt: 1 }),
   ]);
-  const attendance = await Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) }, ...PRESENT }, { sessionId: 1, email: 1 });
+  const attendance = await Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) }, ...PRESENT }, { sessionId: 1, email: 1, source: 1 });
   const dashboard = buildDashboard({
     roster: course.roster.map((r) => ({ email: r.email, firstName: r.firstName, lastName: r.lastName })),
     users: users.map((u) => ({ id: u.id as string, email: u.email })),
     sessions: sessions.map((s) => ({ id: s.id as string, status: s.status, startsAt: s.startsAt, endsAt: s.endsAt })),
-    attendance: attendance.map((a) => ({ sessionId: String(a.sessionId), email: a.email })),
+    attendance: attendance.map((a) => ({ sessionId: String(a.sessionId), email: a.email, source: a.source })),
     now: new Date(),
+    attendanceRequired: course.attendanceRequired !== false,
   });
   const [openQuestions, totalPosts, polls] = await Promise.all([
     countOpenQuestions(course._id),

@@ -5,7 +5,7 @@ import { api, ApiError, type RangeResult, type StudentActive } from '../api';
 import LocationGate, { APPROXIMATE_LOCATION_M, LocationHelp } from '../components/LocationGate';
 import PhoneOnly from '../components/PhoneOnly';
 import StudentCourseTabs from '../components/StudentCourseTabs';
-import { ErrorBox } from '../components/ui';
+import { ErrorBox, BackLink } from '../components/ui';
 import { useLocationWatch, type Reading } from '../hooks/useLocationWatch';
 
 const NO_SESSION_POLL_MS = 5000;
@@ -18,10 +18,10 @@ const toBody = (r: Reading) => ({ lat: r.lat, lng: r.lng, accuracy: r.accuracy, 
 
 function Done({ checkedInAt }: { checkedInAt: string }) {
   return (
-    <div className="rounded-xl bg-emerald-50 p-8 text-center ring-1 ring-emerald-200">
+    <div className="rounded-2xl bg-good-soft p-8 text-center ring-1 ring-good/30">
       <div className="text-6xl">✓</div>
-      <p className="mt-3 text-xl font-bold text-emerald-800">נוכחותך נרשמה</p>
-      <p className="mt-1 text-sm text-emerald-700">בשעה {timeOf(checkedInAt)}</p>
+      <p className="mt-3 text-xl font-bold text-good">נוכחותך נרשמה</p>
+      <p className="mt-1 text-sm text-good">בשעה {timeOf(checkedInAt)}</p>
     </div>
   );
 }
@@ -79,14 +79,14 @@ function CheckInFlow({ sessionId, onDone, onClosed }: { sessionId: string; onDon
 
   if (denied) return <LocationHelp kind="denied" />;
   if (geoError) return <ErrorBox>{geoError}</ErrorBox>;
-  if (!recentBest) return <p className="py-10 text-center text-slate-500">מאתר את מיקומך…</p>;
+  if (!recentBest) return <p className="py-10 text-center text-ink-3">מאתר את מיקומך…</p>;
 
   if (imprecise && recentBest.accuracy > APPROXIMATE_LOCATION_M) return <LocationHelp kind="approximate" />;
   if (imprecise) {
     return (
-      <div className="space-y-3 rounded-xl bg-amber-50 p-6 text-center ring-1 ring-amber-200">
-        <p className="text-lg font-semibold text-amber-900">מחפש מיקום מדויק יותר…</p>
-        <p className="text-sm text-amber-800">
+      <div className="space-y-3 rounded-2xl bg-warn-soft p-6 text-center ring-1 ring-warn/30">
+        <p className="text-lg font-semibold text-warn">מחפש מיקום מדויק יותר…</p>
+        <p className="text-sm text-warn">
           כרגע ±{Math.round(recentBest.accuracy)} מ׳ (נדרש עד {MAX_ACC} מ׳). זה קורה לפעמים בתוך מבנים: ודאו שה-Wi-Fi דלוק (גם בלי
           להתחבר לרשת) והמתינו כמה שניות — הבדיקה ממשיכה אוטומטית.
         </p>
@@ -101,26 +101,26 @@ function CheckInFlow({ sessionId, onDone, onClosed }: { sessionId: string; onDon
           type="button"
           onClick={checkIn}
           disabled={busy}
-          className="aspect-square w-full max-w-xs rounded-full bg-emerald-600 text-4xl font-bold text-white shadow-lg transition active:scale-95 disabled:opacity-60"
+          className="aspect-square w-full max-w-xs rounded-full bg-good-strong text-4xl font-bold text-white shadow-lg transition active:scale-95 disabled:opacity-60"
         >
           {busy ? '…' : 'אני כאן'}
         </button>
       ) : (
-        <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <div className="card p-6">
           {range ? (
             <>
-              <p className="text-sm text-slate-500">את/ה מחוץ לטווח הכיתה</p>
+              <p className="text-sm text-ink-3">את/ה מחוץ לטווח הכיתה</p>
               <p className="mt-2 text-4xl font-bold" dir="ltr">
                 ~{Math.round(range.distanceM)} m
               </p>
-              <p className="mt-2 text-sm text-slate-500">מהמרצה. התקרבו לכיתה — הבדיקה ממשיכה אוטומטית.</p>
+              <p className="mt-2 text-sm text-ink-3">מהמרצה. התקרבו לכיתה — הבדיקה ממשיכה אוטומטית.</p>
             </>
           ) : (
-            <p className="py-4 text-slate-500">בודק אם את/ה בכיתה…</p>
+            <p className="py-4 text-ink-3">בודק אם את/ה בכיתה…</p>
           )}
         </div>
       )}
-      <p className="text-xs text-slate-400" dir="ltr">
+      <p className="text-xs text-ink-4" dir="ltr">
         ±{Math.round(recentBest.accuracy)} m
       </p>
       <ErrorBox>{error}</ErrorBox>
@@ -162,34 +162,32 @@ export default function StudentCheckIn() {
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <Link to="/courses" className="text-sm text-slate-500 hover:underline">
-        → הקורסים שלי
-      </Link>
-      {state && <h1 className="text-xl font-bold">{state.courseName}</h1>}
+      <BackLink to="/courses">הקורסים שלי</BackLink>
+      {state && <h1 className="text-xl">{state.courseName}</h1>}
       <StudentCourseTabs courseId={id} active="checkin" />
       <PhoneOnly>
         <ErrorBox>{error}</ErrorBox>
-        {!state && !error && <p className="text-center text-slate-500">טוען…</p>}
+        {!state && !error && <p className="text-center text-ink-3">טוען…</p>}
         {doneAt ? (
           <Done checkedInAt={doneAt} />
         ) : (
           state &&
           (session && state.markedAbsent ? (
-            <div className="rounded-xl bg-amber-50 p-6 text-center text-amber-900 ring-1 ring-amber-200">
+            <div className="rounded-2xl bg-warn-soft p-6 text-center text-warn ring-1 ring-warn/30">
               <p className="font-semibold">המרצה סימן/ה שלא נכחת במפגש הזה</p>
               <p className="mt-1 text-sm">אם זו טעות, פנו למרצה.</p>
             </div>
           ) : session ? (
             <>
-              <p className="text-center text-sm text-slate-500">נוכחות פתוחה עד {timeOf(session.endsAt)}</p>
+              <p className="text-center text-sm text-ink-3">נוכחות פתוחה עד {timeOf(session.endsAt)}</p>
               <LocationGate purpose="כדי לסמן נוכחות, האפליקציה צריכה לבדוק שאת/ה בכיתה. המיקום משמש רק לבדיקה הזו.">
                 <CheckInFlow sessionId={session.id} onDone={setDoneAt} onClosed={() => setClosed(true)} />
               </LocationGate>
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
+            <div className="rounded-2xl border border-dashed border-line-strong bg-surface-2 p-8 text-center text-ink-2">
               {closed ? 'הנוכחות נסגרה.' : 'אין כרגע נוכחות פתוחה בקורס.'}
-              <p className="mt-2 text-xs text-slate-400">הדף יתעדכן אוטומטית כשהמרצה יפתח נוכחות.</p>
+              <p className="mt-2 text-xs text-ink-4">הדף יתעדכן אוטומטית כשהמרצה יפתח נוכחות.</p>
             </div>
           ))
         )}

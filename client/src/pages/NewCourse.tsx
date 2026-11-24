@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, fileBody, type RosterPreview } from '../api';
-import { ErrorBox, Field, primaryButton } from '../components/ui';
+import { ErrorBox, Field, primaryButton, Toggle } from '../components/ui';
 
 const REASON_HE: Record<string, string> = { 'invalid email': 'אימייל לא תקין', 'missing email': 'חסר אימייל' };
 const PREVIEW_ROWS = 5;
@@ -11,6 +11,7 @@ export default function NewCourse() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [radius, setRadius] = useState('20');
+  const [required, setRequired] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<RosterPreview | null>(null);
   const [error, setError] = useState('');
@@ -37,7 +38,7 @@ export default function NewCourse() {
     setBusy(true);
     setError('');
     try {
-      await api('/courses', { method: 'POST', json: await fileBody(file, { name, defaultRadiusM: Number(radius) }) });
+      await api('/courses', { method: 'POST', json: await fileBody(file, { name, defaultRadiusM: Number(radius), attendanceRequired: required }) });
       navigate('/courses');
     } catch (err) {
       setError((err as Error).message);
@@ -50,38 +51,44 @@ export default function NewCourse() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">קורס חדש</h1>
-        <Link to="/courses" className="text-sm text-slate-600 underline">
+        <h1 className="text-xl">קורס חדש</h1>
+        <Link to="/courses" className="text-sm text-ink-2 underline">
           ביטול
         </Link>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <form onSubmit={onSubmit} className="space-y-4 card p-4">
         <Field label="שם הקורס" required value={name} onChange={(e) => setName(e.target.value)} />
         <Field label="רדיוס ברירת מחדל (מטרים)" type="number" min={5} max={500} required dir="ltr" value={radius} onChange={(e) => setRadius(e.target.value)} />
+        <Toggle
+          checked={required}
+          onChange={setRequired}
+          label="נוכחות חובה"
+          hint="כשהנוכחות חובה, סטודנטים מתחת ל-70% נוכחות יופיעו ב&quot;דורש תשומת לב&quot;."
+        />
 
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-slate-700">רשימת סטודנטים (‎.xlsx או ‎.csv)</span>
+          <span className="mb-1 block text-sm font-medium text-ink-2">רשימת סטודנטים (‎.xlsx או ‎.csv)</span>
           <input
             type="file"
             accept=".csv,.xlsx"
             onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm file:me-3 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-indigo-700"
+            className="block w-full text-sm file:me-3 file:rounded-md file:border-0 file:bg-accent-soft file:px-3 file:py-2 file:text-accent-ink"
           />
-          <span className="mt-1 block text-xs text-slate-500">עמודות: שם פרטי, שם משפחה, דוא״ל</span>
+          <span className="mt-1 block text-xs text-ink-3">עמודות: שם פרטי, שם משפחה, דוא״ל</span>
         </label>
 
         {preview && (
-          <div className="space-y-3 rounded-lg bg-slate-50 p-3 text-sm">
+          <div className="space-y-3 rounded-xl bg-surface p-3 text-sm">
             <p className="font-medium">
-              נמצאו <span className="text-emerald-700">{preview.entries.length}</span> סטודנטים
+              נמצאו <span className="text-good">{preview.entries.length}</span> סטודנטים
               {preview.duplicates > 0 && ` · ${preview.duplicates} כפולים הוסרו`}
-              {preview.skipped.length > 0 && <span className="text-amber-700">{` · ${preview.skipped.length} שורות דולגו`}</span>}
+              {preview.skipped.length > 0 && <span className="text-warn">{` · ${preview.skipped.length} שורות דולגו`}</span>}
             </p>
             {preview.entries.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-start">
-                  <thead className="text-slate-500">
+                  <thead className="text-ink-3">
                     <tr>
                       <th className="py-1 text-start font-medium">שם משפחה</th>
                       <th className="py-1 text-start font-medium">שם פרטי</th>
@@ -90,7 +97,7 @@ export default function NewCourse() {
                   </thead>
                   <tbody>
                     {preview.entries.slice(0, PREVIEW_ROWS).map((r) => (
-                      <tr key={r.email} className="border-t border-slate-200">
+                      <tr key={r.email} className="border-t border-line">
                         <td className="py-1">{r.lastName}</td>
                         <td className="py-1">{r.firstName}</td>
                         <td className="py-1" dir="ltr">
@@ -100,11 +107,11 @@ export default function NewCourse() {
                     ))}
                   </tbody>
                 </table>
-                {preview.entries.length > PREVIEW_ROWS && <p className="mt-1 text-slate-500">ועוד {preview.entries.length - PREVIEW_ROWS}…</p>}
+                {preview.entries.length > PREVIEW_ROWS && <p className="mt-1 text-ink-3">ועוד {preview.entries.length - PREVIEW_ROWS}…</p>}
               </div>
             )}
             {preview.skipped.length > 0 && (
-              <ul className="list-inside list-disc text-amber-800">
+              <ul className="list-inside list-disc text-warn">
                 {preview.skipped.map((s) => (
                   <li key={s.row}>
                     שורה {s.row}: {REASON_HE[s.reason] ?? s.reason}

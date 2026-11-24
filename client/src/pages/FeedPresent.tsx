@@ -29,36 +29,36 @@ export default function FeedPresent() {
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.votes - a.votes || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   return (
-    <div className="min-h-dvh bg-slate-900 p-6 text-white lg:p-10">
+    <div className="min-h-dvh bg-bg p-6 text-ink lg:p-10">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 lg:flex-row">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-4">
-            <h1 className="text-3xl font-bold lg:text-4xl">שאלות פתוחות{feed && ` · ${feed.course.name}`}</h1>
-            <Link to={`/courses/${id}/feed`} className="shrink-0 text-sm text-slate-400 hover:text-white">
+            <h1 className="text-3xl lg:text-4xl">שאלות פתוחות{feed && ` · ${feed.course.name}`}</h1>
+            <Link to={`/courses/${id}/feed`} className="shrink-0 text-sm text-ink-4 hover:text-ink">
               יציאה ממסך הקרנה
             </Link>
           </div>
           <ol className="mt-6 space-y-4">
             {open.slice(0, SHOW).map((p) => (
-              <li key={p.id} className="flex items-start gap-5 rounded-2xl bg-slate-800 p-5">
-                <span className="w-16 shrink-0 text-center text-3xl font-bold tabular-nums text-indigo-300">
+              <li key={p.id} className="flex items-start gap-5 rounded-2xl bg-elevated p-5">
+                <span className="w-16 shrink-0 text-center text-3xl font-bold tabular-nums text-accent-ink">
                   {p.votes}
-                  <span className="block text-sm font-normal text-slate-400">👍</span>
+                  <span className="block text-sm font-normal text-ink-4">👍</span>
                 </span>
                 <p className="min-w-0 whitespace-pre-wrap break-words text-2xl leading-snug lg:text-3xl">
-                  {p.pinned && '📌 '}
+                  {p.pinned && <span className="me-3 rounded-lg bg-accent-soft px-2 py-0.5 align-middle text-base text-accent-ink">נעוץ</span>}
                   {p.text}
                 </p>
               </li>
             ))}
           </ol>
-          {feed && open.length === 0 && <p className="mt-10 text-2xl text-slate-400">אין כרגע שאלות פתוחות 🎉</p>}
-          {open.length > SHOW && <p className="mt-4 text-lg text-slate-400">ועוד {open.length - SHOW} שאלות…</p>}
+          {feed && open.length === 0 && <p className="mt-10 text-2xl text-ink-4">אין כרגע שאלות פתוחות.</p>}
+          {open.length > SHOW && <p className="mt-4 text-lg text-ink-4">ועוד {open.length - SHOW} שאלות…</p>}
         </div>
         <aside className="shrink-0 text-center lg:w-80">
-          {qr && <img src={qr} alt="קוד QR להצטרפות" className="mx-auto w-64 rounded-xl bg-white p-2 lg:w-72" />}
+          {qr && <img src={qr} alt="קוד QR להצטרפות" className="mx-auto w-64 card p-2 lg:w-72" />}
           <p className="mt-3 text-xl">סרקו כדי לשאול</p>
-          <p className="mt-1 text-sm text-slate-400">אפשר לשאול באנונימיות</p>
+          <p className="mt-1 text-sm text-ink-4">אפשר לשאול באנונימיות</p>
         </aside>
       </div>
     </div>

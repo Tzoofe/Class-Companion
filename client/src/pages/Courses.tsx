@@ -1,10 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { api, type Agenda, type LecturerOverview, type StudentCourse } from '../api';
+import { api, type Agenda, type AgendaItem, type LecturerOverview, type StudentCourse } from '../api';
 import { useAuth } from '../auth';
-import AgendaList, { LinkButton, timing } from '../components/AgendaList';
+import { KIND_HE, LinkButton, dayLabel, timing } from '../components/AgendaList';
+import { Bento, Tile } from '../components/Bento';
+import DotGrid, { DotLegend } from '../components/DotGrid';
+import { IconAlert, IconBook, IconCalendar, IconCheck, IconPin, IconPoll, IconQuestion } from '../components/icons';
 import NotificationsCard from '../components/NotificationsCard';
-import { ErrorBox } from '../components/ui';
+import { ErrorBox, ghostButton, pillButton } from '../components/ui';
 
 const REFRESH_MS = 15_000;
 
@@ -29,230 +32,248 @@ function useLive<T>(path: string) {
   return { data, error };
 }
 
-function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' });
+const clock = (iso: string) => new Date(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+const isLesson = (i: AgendaItem) => !i.cancelled && (i.kind === 'class' || i.kind === 'extra');
+const itemTitle = (i: AgendaItem) => (i.kind === 'class' ? i.title || KIND_HE.class : i.title || KIND_HE[i.kind]);
+
+/** Small status chip with an icon; the text always says what it means. */
+function Chip({ tone, icon, children }: { tone: 'accent' | 'good' | 'warn' | 'muted'; icon?: ReactNode; children: ReactNode }) {
+  const cls = { accent: 'bg-accent-soft text-accent-ink', good: 'bg-good-soft text-good', warn: 'bg-warn-soft text-warn', muted: 'bg-surface-2 text-ink-3' }[tone];
   return (
-    <section className="space-y-2">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {action}
-      </div>
+    <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs ${cls}`}>
+      {icon}
       {children}
-    </section>
+    </span>
   );
 }
 
-function Tile({ label, value }: { label: string; value: ReactNode }) {
+/** Compact list of agenda items for inside a tile (no nested cards). */
+function AgendaRows({ items, agenda, action, showDay }: { items: AgendaItem[]; agenda: Agenda; action?: (i: AgendaItem) => ReactNode; showDay?: boolean }) {
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
-    </div>
+    <ul className="-mx-1 divide-y divide-line">
+      {items.map((i, n) => {
+        const t = timing(i, agenda.now);
+        return (
+          <li key={`${i.courseId}-${i.slotId ?? i.eventId}-${i.date}-${n}`} className={`flex items-start gap-3 px-1 py-2.5 ${t === 'past' ? 'opacity-50' : ''}`}>
+            <span className="w-12 shrink-0 pt-0.5 text-sm tabular-nums text-ink-2" dir="ltr">
+              {i.start}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className={`block truncate text-sm ${i.cancelled ? 'text-ink-4 line-through' : ''}`}>{i.courseName}</span>
+              <span className="block truncate text-xs text-ink-3">
+                {showDay && `${dayLabel(i.date, agenda.now.date)}, `}
+                {i.cancelled ? 'בוטל' : itemTitle(i)}
+                {i.place && `, ${i.place}`}
+              </span>
+            </span>
+            {t === 'now' && !i.cancelled && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-good" aria-label="עכשיו" />}
+            {action?.(i)}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
-
-/** Attendance % over the last sessions: one series, no axes; the last point is marked. */
-function Sparkline({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
-  const w = 96;
-  const h = 28;
-  const x = (i: number) => (i / (values.length - 1)) * (w - 4) + 2;
-  const y = (v: number) => h - 2 - (v / 100) * (h - 4);
-  const points = values.map((v, i) => `${x(i)},${y(v)}`).join(' ');
-  const last = values[values.length - 1];
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`נוכחות ב-${values.length} המפגשים האחרונים: ${values.join('%, ')}%`} className="shrink-0">
-      <polyline points={points} fill="none" className="stroke-indigo-500" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={x(values.length - 1)} cy={y(last)} r={3} className="fill-indigo-600 stroke-white" strokeWidth={1.5} />
-    </svg>
-  );
-}
-
-const shortWhen = (iso: string) => new Date(iso).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' });
 
 // ───────────────────────── Lecturer ─────────────────────────
 
-function LecturerHome() {
-  const { user } = useAuth();
-  const { data: overview, error } = useLive<LecturerOverview>('/me/overview');
-  const { data: agenda } = useLive<Agenda>('/me/agenda?days=7');
-
-  const live = overview?.live;
-  const liveCourses = new Set(live?.sessions.map((s) => s.courseId));
-  const today = agenda ? { ...agenda, items: agenda.items.filter((i) => i.date === agenda.now.date) } : null;
-  const later = agenda?.items.filter((i) => i.date > agenda.now.date && !i.cancelled) ?? [];
-  const tomorrow = agenda ? later.filter((i) => i.date === nextDate(agenda.now.date)).length : 0;
-
+/** One thing waiting for the lecturer, linking to where it's handled. */
+function ActionRow({ to, icon, title, detail, tone = 'muted' }: { to: string; icon: ReactNode; title: string; detail: string; tone?: 'muted' | 'accent' | 'warn' }) {
+  const color = { muted: 'text-ink-3', accent: 'text-accent-ink', warn: 'text-warn' }[tone];
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold">שלום{user?.firstName ? `, ${user.firstName}` : ''}</h1>
-        <Link to="/courses/new" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-          + קורס חדש
-        </Link>
-      </div>
-      <ErrorBox>{error}</ErrorBox>
-
-      {/* Happening now */}
-      {live && (live.sessions.length > 0 || live.polls.length > 0) && (
-        <div className="space-y-2">
-          {live.sessions.map((s) => (
-            <Link key={s.sessionId} to={`/courses/${s.courseId}/attendance`} className="flex items-center justify-between gap-3 rounded-xl bg-emerald-600 p-4 text-white shadow-sm hover:bg-emerald-700">
-              <span>
-                <span className="block text-xs text-emerald-100">● נוכחות פתוחה</span>
-                <span className="font-medium">{s.courseName}</span>
-              </span>
-              <span className="text-lg font-bold tabular-nums">
-                {s.present}/{s.rosterCount}
-              </span>
-            </Link>
-          ))}
-          {live.polls.map((p) => (
-            <Link key={p.pollId} to={`/courses/${p.courseId}/polls`} className="flex items-center justify-between gap-3 rounded-xl bg-indigo-600 p-4 text-white shadow-sm hover:bg-indigo-700">
-              <span className="min-w-0">
-                <span className="block text-xs text-indigo-200">📊 סקר פתוח · {p.courseName}</span>
-                <span className="block truncate font-medium">{p.question}</span>
-              </span>
-              <span className="shrink-0 text-sm tabular-nums">{p.responses} ענו</span>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {/* Today */}
-      <Section title="היום">
-        {today && (
-          <AgendaList
-            agenda={today}
-            action={(item) => {
-              if (item.kind !== 'class' && item.kind !== 'extra') return null;
-              if (item.cancelled) return null;
-              const t = timing(item, today.now);
-              if (liveCourses.has(item.courseId))
-                return (
-                  <LinkButton to={`/courses/${item.courseId}/attendance`} tone="live">
-                    ● למפגש
-                  </LinkButton>
-                );
-              if (t === 'now' || t === 'soon') return <LinkButton to={`/courses/${item.courseId}/attendance`}>התחל נוכחות</LinkButton>;
-              return null;
-            }}
-            empty={
-              <div className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
-                {agenda?.hasSchedule ? (
-                  <>אין שיעורים היום.{later[0] && ` הבא: ${later[0].courseName}, ${later[0].date === nextDate(agenda.now.date) ? 'מחר' : shortWhen(later[0].date)} ב-${later[0].start}.`}</>
-                ) : (
-                  <>עוד לא הוגדרו זמני שיעורים. היכנסו לקורס ← "לוח זמנים" כדי להוסיף את השיעורים השבועיים, ואז הם יופיעו כאן.</>
-                )}
-              </div>
-            }
-          />
-        )}
-        {agenda && agenda.items.length > 0 && (
-          <p className="text-xs text-slate-500">
-            מחר: {tomorrow} · ב-7 הימים הקרובים: {later.length}
-          </p>
-        )}
-      </Section>
-
-      {/* Summary */}
-      {overview && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Tile label="קורסים" value={overview.totals.courses} />
-          <Tile label="סטודנטים" value={overview.totals.students} />
-          <Tile label="נוכחות השבוע" value={overview.totals.weekAttendancePercent === null ? '—' : `${overview.totals.weekAttendancePercent}%`} />
-          <Tile label="שאלות פתוחות" value={overview.totals.openQuestions} />
-        </div>
-      )}
-
-      {/* Needs attention */}
-      {overview && (overview.attention.questions.length > 0 || overview.attention.atRisk.length > 0) && (
-        <Section title="דורש תשומת לב">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {overview.attention.questions.length > 0 && (
-              <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">❓ שאלות פתוחות מובילות</h3>
-                <ul className="divide-y divide-slate-100">
-                  {overview.attention.questions.map((q) => (
-                    <li key={q.postId}>
-                      <Link to={`/courses/${q.courseId}/feed`} className="flex items-start justify-between gap-3 py-2 hover:bg-slate-50">
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm">{q.text}</span>
-                          <span className="text-xs text-slate-500">{q.courseName}</span>
-                        </span>
-                        <span className="shrink-0 text-sm tabular-nums text-slate-500">👍 {q.votes}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {overview.attention.atRisk.length > 0 && (
-              <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">⚠ נוכחות נמוכה (מתחת ל-70%)</h3>
-                <ul className="divide-y divide-slate-100">
-                  {overview.attention.atRisk.map((r) => (
-                    <li key={r.courseId}>
-                      <Link to={`/courses/${r.courseId}/students`} className="flex items-center justify-between gap-3 py-2 text-sm hover:bg-slate-50">
-                        <span>{r.courseName}</span>
-                        <span className="text-amber-700">{r.count} סטודנטים ←</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </Section>
-      )}
-
-      {/* Courses */}
-      <Section title="הקורסים שלי">
-        {overview && overview.courses.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">עדיין אין קורסים. צרו קורס חדש עם רשימת הסטודנטים.</div>
-        )}
-        {!overview && !error && <p className="text-slate-500">טוען…</p>}
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {overview?.courses.map((c) => (
-            <li key={c.id}>
-              <Link to={`/courses/${c.id}`} className="block h-full rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 transition hover:ring-indigo-300">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="truncate font-semibold">{c.name}</h3>
-                    <p className="mt-0.5 text-sm text-slate-500">
-                      {c.rosterCount} סטודנטים · {c.sessionCount} מפגשים
-                    </p>
-                  </div>
-                  <Sparkline values={c.trend} />
-                </div>
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                  <span>
-                    נוכחות ממוצעת: <strong className="tabular-nums">{c.averagePercent === null ? '—' : `${c.averagePercent}%`}</strong>
-                  </span>
-                  {c.lastSession && (
-                    <span className="text-slate-600">
-                      אחרון ({shortWhen(c.lastSession.startsAt)}): <span className="tabular-nums">{c.lastSession.present}/{c.rosterCount}</span>
-                    </span>
-                  )}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-                  {c.liveSession && <span className="rounded bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">● נוכחות פתוחה</span>}
-                  {c.pollOpen && <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-700">📊 סקר פתוח</span>}
-                  {c.openQuestions > 0 && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-700">❓ {c.openQuestions} שאלות</span>}
-                  {c.atRiskCount > 0 && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-800">⚠ {c.atRiskCount} בנוכחות נמוכה</span>}
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Section>
-    </div>
+    <li>
+      <Link to={to} className="flex items-start gap-3 rounded-lg px-1 py-2.5 transition-colors hover:bg-surface-2">
+        <span className={`mt-0.5 shrink-0 ${color}`}>{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 block text-sm">{title}</span>
+          <span className="block truncate text-xs text-ink-3">{detail}</span>
+        </span>
+      </Link>
+    </li>
   );
 }
 
-function nextDate(date: string) {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
+/** The hero tile: what's live, else the next lesson today, else the latest session. */
+function NowTile({ overview, agenda }: { overview: LecturerOverview; agenda: Agenda | null }) {
+  const live = overview.live.sessions[0];
+  if (live) {
+    return (
+      <Tile size="lg" title={`נוכחות פתוחה עד ${clock(live.endsAt)}`} icon={<span className="block h-2 w-2 rounded-full bg-good motion-safe:animate-pulse" />} action={<Link to={`/courses/${live.courseId}/attendance`} className={pillButton}>למסך הנוכחות</Link>}>
+        <h2 className="text-2xl">{live.courseName}</h2>
+        <div className="mt-5">
+          <DotGrid present={live.present} manual={live.manual} total={live.rosterCount} size="lg" />
+        </div>
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-5">
+          <p className="font-display text-5xl leading-none tabular-nums">
+            {live.present}
+            <span className="text-2xl text-ink-3"> מתוך {live.rosterCount} סטודנטים</span>
+            <span className="mt-2 block font-sans text-sm text-ink-3">סימנו נוכחות עד עכשיו</span>
+          </p>
+          <DotLegend withManual={live.manual > 0} />
+        </div>
+      </Tile>
+    );
+  }
+
+  const next = agenda?.items.find((i) => i.date === agenda.now.date && isLesson(i) && timing(i, agenda.now) !== 'past');
+  if (next && agenda) {
+    const t = timing(next, agenda.now);
+    return (
+      <Tile size="lg" title={t === 'now' ? 'עכשיו' : t === 'soon' ? 'מתחיל בקרוב' : 'השיעור הבא היום'} icon={<IconCalendar />}>
+        <p className="font-display text-6xl leading-none tabular-nums" dir="ltr">
+          {next.start}
+          {next.end && <span className="text-2xl text-ink-3">–{next.end}</span>}
+        </p>
+        <h2 className="mt-4 text-2xl">{next.courseName}</h2>
+        <p className="mt-1 text-ink-2">
+          {itemTitle(next)}
+          {next.place && `, ${next.place}`}
+        </p>
+        <div className="mt-auto pt-6">
+          <Link to={`/courses/${next.courseId}/attendance`} className={t === 'later' ? ghostButton : pillButton}>
+            התחלת נוכחות
+          </Link>
+        </div>
+      </Tile>
+    );
+  }
+
+  const latest = [...overview.courses].filter((c) => c.lastSession).sort((a, b) => b.lastSession!.startsAt.localeCompare(a.lastSession!.startsAt))[0];
+  if (latest?.lastSession) {
+    const s = latest.lastSession;
+    return (
+      <Tile size="lg" title={`המפגש האחרון, ${shortDate(s.startsAt)}`} icon={<IconCheck />} to={`/courses/${latest.id}`}>
+        <h2 className="text-2xl">{latest.name}</h2>
+        <div className="mt-5">
+          <DotGrid present={s.present} manual={s.manual} total={latest.rosterCount} size="lg" />
+        </div>
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-5">
+          <p className="font-display text-5xl leading-none tabular-nums">
+            {s.present}
+            <span className="text-2xl text-ink-3"> מתוך {latest.rosterCount} סטודנטים</span>
+            <span className="mt-2 block font-sans text-sm text-ink-3">נכחו במפגש</span>
+          </p>
+          <DotLegend withManual={s.manual > 0} />
+        </div>
+      </Tile>
+    );
+  }
+
+  return (
+    <Tile size="lg" title="מתחילים">
+      <h2 className="text-2xl">{overview.courses.length ? 'עוד לא התקיים מפגש' : 'עדיין אין קורסים'}</h2>
+      <p className="mt-2 text-ink-2">
+        {overview.courses.length ? 'כשתפתחו נוכחות בשיעור, הכיתה תתמלא כאן בזמן אמת.' : 'צרו קורס מקובץ רשימת הסטודנטים, והסטודנטים יראו אותו אוטומטית.'}
+      </p>
+      <div className="mt-auto pt-6">
+        <Link to="/courses/new" className={pillButton}>
+          {overview.courses.length ? 'קורס חדש' : 'יצירת קורס'}
+        </Link>
+      </div>
+    </Tile>
+  );
+}
+
+function LecturerHome() {
+  const { data: overview, error } = useLive<LecturerOverview>('/me/overview');
+  const { data: agenda } = useLive<Agenda>('/me/agenda?days=7');
+
+  if (!overview) return error ? <ErrorBox>{error}</ErrorBox> : <p className="text-ink-3">טוען…</p>;
+
+  const liveCourses = new Set(overview.live.sessions.map((s) => s.courseId));
+  const todayItems = agenda?.items.filter((i) => i.date === agenda.now.date) ?? [];
+  const laterItems = agenda?.items.filter((i) => i.date > agenda.now.date && !i.cancelled) ?? [];
+  const { questions, atRisk } = overview.attention;
+  const polls = overview.live.polls;
+  const nothingToDo = !questions.length && !atRisk.length && !polls.length;
+
+  return (
+    <div className="space-y-3">
+      <h1 className="sr-only">דף הבית</h1>
+      <ErrorBox>{error}</ErrorBox>
+      <Bento>
+        <NowTile overview={overview} agenda={agenda} />
+
+        <Tile size="tall" title="היום" icon={<IconCalendar />}>
+          {!agenda ? (
+            <p className="text-sm text-ink-3">טוען…</p>
+          ) : todayItems.length ? (
+            <AgendaRows
+              items={todayItems}
+              agenda={agenda}
+              action={(i) => {
+                if (!isLesson(i)) return null;
+                if (liveCourses.has(i.courseId)) return <LinkButton to={`/courses/${i.courseId}/attendance`} tone="live">פתוח</LinkButton>;
+                const t = timing(i, agenda.now);
+                return t === 'now' || t === 'soon' ? <LinkButton to={`/courses/${i.courseId}/attendance`}>התחלה</LinkButton> : null;
+              }}
+            />
+          ) : agenda.hasSchedule ? (
+            <div className="text-sm">
+              <p className="text-ink-2">אין שיעורים היום.</p>
+              {laterItems[0] && (
+                <p className="mt-2 text-ink-3">
+                  הבא: {laterItems[0].courseName}, {dayLabel(laterItems[0].date, agenda.now.date)} ב-{laterItems[0].start}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-ink-2">הוסיפו זמני שיעור בלוח הזמנים של כל קורס, והם יופיעו כאן.</p>
+          )}
+          {laterItems.length > 0 && todayItems.length > 0 && <p className="mt-auto pt-3 text-xs text-ink-3">עוד {laterItems.length} ב-7 הימים הקרובים</p>}
+        </Tile>
+
+        <Tile size="tall" title="דורש טיפול" icon={<IconAlert />}>
+          {nothingToDo ? (
+            <p className="text-sm text-ink-3">אין כרגע שום דבר שמחכה לך.</p>
+          ) : (
+            <ul className="-mx-1 divide-y divide-line">
+              {questions.map((q) => (
+                <ActionRow key={q.postId} to={`/courses/${q.courseId}/feed`} icon={<IconQuestion />} title={q.text} detail={`שאלה ללא מענה ב${q.courseName}${q.votes ? `, ${q.votes} 👍` : ''}`} />
+              ))}
+              {polls.map((p) => (
+                <ActionRow key={p.pollId} to={`/courses/${p.courseId}/polls`} icon={<IconPoll />} tone="accent" title={p.question} detail={`סקר פתוח ב${p.courseName}, ${p.responses} ענו`} />
+              ))}
+              {atRisk.map((r) => (
+                <ActionRow key={r.courseId} to={`/courses/${r.courseId}/students`} icon={<IconAlert />} tone="warn" title={`${r.count} סטודנטים מתחת ל-70% נוכחות`} detail={r.courseName} />
+              ))}
+            </ul>
+          )}
+        </Tile>
+
+        {overview.courses.map((c) => {
+          const shown = c.live ?? c.lastSession;
+          return (
+            <Tile key={c.id} size="item" title={`${c.rosterCount} סטודנטים`} icon={<IconBook />} to={`/courses/${c.id}`}>
+              <h3 className="text-lg leading-snug">{c.name}</h3>
+              <div className="mt-auto space-y-2 pt-4">
+                {shown ? (
+                  <>
+                    <DotGrid present={shown.present} manual={shown.manual} total={c.rosterCount} size="sm" />
+                    <p className="text-sm text-ink-2">
+                      {c.live ? `סימנו נוכחות עכשיו: ${shown.present} מתוך ${c.rosterCount}` : `נכחו ${shown.present} מתוך ${c.rosterCount} במפגש האחרון`}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-ink-3">עוד לא התקיים מפגש.</p>
+                )}
+                <div className="flex flex-wrap gap-1.5">
+                  {!c.attendanceRequired && <Chip tone="muted">נוכחות רשות</Chip>}
+                  {c.liveSession && <Chip tone="good">נוכחות פתוחה</Chip>}
+                  {c.pollOpen && <Chip tone="accent" icon={<IconPoll />}>סקר פתוח</Chip>}
+                </div>
+              </div>
+            </Tile>
+          );
+        })}
+
+        <Link to="/courses/new" className="col-span-2 flex min-h-16 items-center lg:min-h-[9.5rem] justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong text-ink-3 transition-colors hover:border-accent hover:text-accent-ink lg:col-span-1">
+          קורס חדש
+        </Link>
+      </Bento>
+    </div>
+  );
 }
 
 // ───────────────────────── Student ─────────────────────────
@@ -262,53 +283,78 @@ function StudentHome() {
   const { data: agenda } = useLive<Agenda>('/me/agenda?days=7');
   const courses = data?.courses ?? null;
 
+  const next = agenda?.items.find((i) => isLesson(i) && timing(i, agenda.now) !== 'past');
+  const t = next && agenda ? timing(next, agenda.now) : null;
+  const rest = agenda?.items.filter((i) => i !== next && timing(i, agenda.now) !== 'past') ?? [];
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-bold">הקורסים שלי</h1>
+    <div className="space-y-3">
+      <h1 className="sr-only">דף הבית</h1>
       <NotificationsCard />
       <ErrorBox>{error}</ErrorBox>
+      {courses === null && !error && <p className="text-ink-3">טוען…</p>}
 
-      {agenda && agenda.hasSchedule && (
-        <Section title="השבוע">
-          <AgendaList
-            agenda={agenda}
-            action={(item) => {
-              if (item.cancelled || (item.kind !== 'class' && item.kind !== 'extra')) return null;
-              const t = timing(item, agenda.now);
-              return t === 'now' || t === 'soon' ? <LinkButton to={`/courses/${item.courseId}/checkin`}>סימון נוכחות</LinkButton> : null;
-            }}
-            empty={<div className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">אין שיעורים ב-7 הימים הקרובים.</div>}
-          />
-        </Section>
+      {courses?.length === 0 && (
+        <div className="card p-6 text-ink-2">אינך רשום/ה לאף קורס. אם זו טעות, בקשו מהמרצה להוסיף את המייל שלך לרשימת הקורס.</div>
       )}
 
-      <Section title={agenda?.hasSchedule ? 'קורסים' : ''}>
-        {courses === null && !error && <p className="text-slate-500">טוען…</p>}
-        {courses?.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
-            אינך רשום/ה לאף קורס. אם זו טעות, פנו למרצה כדי שיוסיף את האימייל שלך.
-          </div>
-        )}
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {courses?.map((c) => (
-            <li key={c.id} className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-              <h3 className="font-semibold">{c.name}</h3>
-              {c.lecturerName && <p className="mt-1 text-sm text-slate-500">מרצה: {c.lecturerName}</p>}
-              <div className="mt-3 grid grid-cols-3 gap-2 text-sm font-medium">
-                <Link to={`/courses/${c.id}/checkin`} className="rounded-lg bg-indigo-600 px-2 py-2 text-center text-white hover:bg-indigo-700">
+      {courses && courses.length > 0 && (
+        <Bento>
+          {next && agenda ? (
+            <Tile size="lg" title={t === 'now' ? 'עכשיו' : t === 'soon' ? 'מתחיל בקרוב' : `השיעור הבא, ${dayLabel(next.date, agenda.now.date)}`} icon={<IconCalendar />} tone={t === 'now' || t === 'soon' ? 'accent' : 'plain'}>
+              <p className="font-display text-6xl leading-none tabular-nums" dir="ltr">
+                {next.start}
+                {next.end && <span className="text-2xl text-ink-3">–{next.end}</span>}
+              </p>
+              <h2 className="mt-4 text-2xl">{next.courseName}</h2>
+              <p className="mt-1 flex items-center gap-1.5 text-ink-2">
+                {itemTitle(next)}
+                {next.place && (
+                  <>
+                    <IconPin className="text-ink-3" />
+                    {next.place}
+                  </>
+                )}
+              </p>
+              {(t === 'now' || t === 'soon') && (
+                <div className="mt-auto pt-6">
+                  <Link to={`/courses/${next.courseId}/checkin`} className={`${pillButton} w-full py-3 text-base sm:w-auto`}>
+                    סימון נוכחות
+                  </Link>
+                </div>
+              )}
+            </Tile>
+          ) : (
+            <Tile size="lg" title="השבוע" icon={<IconCalendar />}>
+              <h2 className="text-2xl">{agenda?.hasSchedule ? 'אין שיעורים בשבוע הקרוב' : 'עוד אין מערכת שעות'}</h2>
+              <p className="mt-2 text-ink-2">כשהמרצה יוסיף/תוסיף זמני שיעור, השיעור הבא יופיע כאן.</p>
+            </Tile>
+          )}
+
+          {agenda?.hasSchedule && (
+            <Tile size="tall" title="בהמשך השבוע" icon={<IconCalendar />}>
+              {rest.length ? <AgendaRows items={rest.slice(0, 8)} agenda={agenda} showDay /> : <p className="text-sm text-ink-3">אין עוד שיעורים השבוע.</p>}
+            </Tile>
+          )}
+
+          {courses.map((c) => (
+            <Tile key={c.id} size="wide" title={c.lecturerName || 'קורס'} icon={<IconBook />}>
+              <h3 className="text-xl">{c.name}</h3>
+              <div className="mt-auto flex flex-wrap gap-2 pt-4">
+                <Link to={`/courses/${c.id}/checkin`} className={pillButton}>
                   נוכחות
                 </Link>
-                <Link to={`/courses/${c.id}/feed`} className="rounded-lg bg-white px-2 py-2 text-center text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50">
+                <Link to={`/courses/${c.id}/feed`} className={ghostButton}>
                   שאלות
                 </Link>
-                <Link to={`/courses/${c.id}/polls`} className="rounded-lg bg-white px-2 py-2 text-center text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50">
+                <Link to={`/courses/${c.id}/polls`} className={ghostButton}>
                   סקרים
                 </Link>
               </div>
-            </li>
+            </Tile>
           ))}
-        </ul>
-      </Section>
+        </Bento>
+      )}
     </div>
   );
 }

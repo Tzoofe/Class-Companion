@@ -29,6 +29,8 @@ const courseSchema = new Schema(
     // Enrollment = roster membership by email; students see a course once their email is listed.
     roster: { type: [rosterEntrySchema], default: [] },
     defaultRadiusM: { type: Number, default: 20, min: 5, max: 500 },
+    /** Mandatory attendance: only then are students under the threshold flagged. */
+    attendanceRequired: { type: Boolean, default: true },
     schedule: { type: [slotSchema], default: [] },
     /** "YYYY-MM-DD"; weekly slots repeat only between these dates (when set). */
     semesterStart: { type: String },

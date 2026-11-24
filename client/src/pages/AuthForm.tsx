@@ -41,8 +41,8 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const isLogin = mode === 'login';
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center p-6">
-      <h1 className="text-2xl font-bold text-indigo-700">Class Companion</h1>
-      <p className="mb-6 mt-1 text-slate-600">{isLogin ? 'התחברות' : 'הרשמה לסטודנטים'}</p>
+      <h1 className="text-2xl text-accent-ink">Class Companion</h1>
+      <p className="mb-6 mt-1 text-ink-2">{isLogin ? 'התחברות' : 'הרשמה לסטודנטים'}</p>
       <form onSubmit={onSubmit} className="space-y-4">
         <Field
           label={!isLogin && domains.length ? 'מייל אוניברסיטאי' : 'אימייל'}
@@ -55,7 +55,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           onChange={(e) => setEmail(e.target.value)}
         />
         {wrongDomain && (
-          <p className="-mt-2 text-xs text-amber-700">
+          <p className="-mt-2 text-xs text-warn">
             זה לא מייל אוניברסיטאי. ההרשמה תעבוד רק אם המרצה הוסיף/ה בדיוק את הכתובת הזו לרשימת הקורס.
           </p>
         )}
@@ -70,7 +70,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           onChange={(e) => setPassword(e.target.value)}
         />
         {!isLogin && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-3">
             {domains.length ? (
               <>
                 הירשמו עם המייל האוניברסיטאי (<span dir="ltr">@{domains[0]}</span>), או עם המייל שהמרצה רשם/ה ברשימת הקורס — כך הקורסים שלכם יופיעו אוטומטית. השם יילקח מהרשימה.
@@ -85,14 +85,14 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           {busy ? '…' : isLogin ? 'התחברות' : 'הרשמה'}
         </button>
       </form>
-      <p className="mt-6 text-center text-sm text-slate-600">
+      <p className="mt-6 text-center text-sm text-ink-2">
         {isLogin ? (
           <>
-            סטודנט/ית חדש/ה? <Link to="/signup" className="text-indigo-700 underline">להרשמה</Link>
+            סטודנט/ית חדש/ה? <Link to="/signup" className="text-accent-ink underline">להרשמה</Link>
           </>
         ) : (
           <>
-            כבר רשומים? <Link to="/login" className="text-indigo-700 underline">להתחברות</Link>
+            כבר רשומים? <Link to="/login" className="text-accent-ink underline">להתחברות</Link>
           </>
         )}
       </p>

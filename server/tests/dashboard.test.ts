@@ -81,3 +81,26 @@ describe('buildDashboard', () => {
     expect(d.finishedSessionCount).toBe(15);
   });
 });
+
+describe('buildDashboard: optional attendance and manual marks', () => {
+  it('flags nobody when attendance is not mandatory', () => {
+    const d = buildDashboard(input({ sessions: [closed('s1', 1)], attendanceRequired: false }));
+    expect(d.atRisk).toEqual([]);
+    expect(d.atRiskCount).toBe(0);
+    expect(d.attendanceRequired).toBe(false);
+    expect(buildDashboard(input({ sessions: [closed('s1', 1)] })).atRiskCount).toBe(4); // default: mandatory
+  });
+
+  it('counts manual marks per session', () => {
+    const d = buildDashboard(
+      input({
+        sessions: [closed('s1', 1)],
+        attendance: [
+          { sessionId: 's1', email: 'dana@x.com', source: 'gps' },
+          { sessionId: 's1', email: 'ron@x.com', source: 'manual' },
+        ],
+      }),
+    );
+    expect(d.lastSession).toMatchObject({ present: 2, manual: 1 });
+  });
+});

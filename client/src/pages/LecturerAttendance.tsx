@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ATTENDANCE_RULES } from '../../../shared/attendance';
-import { api, ApiError, type CourseSessionsList, type LiveSession, type SessionStatus } from '../api';
+import { api, ApiError, type CourseSessionsList, type LiveSession, type SessionRoster as Roster, type SessionStatus } from '../api';
 import LocationGate, { LocationHelp } from '../components/LocationGate';
 import { OpenOnPhoneQr } from '../components/PhoneOnly';
+import DotGrid, { DotLegend } from '../components/DotGrid';
 import SessionRoster from '../components/SessionRoster';
-import { ErrorBox, primaryButton } from '../components/ui';
+import { ErrorBox, primaryButton, BackLink } from '../components/ui';
 import { isMobileDevice } from '../hooks/useIsMobile';
 import { useLocationWatch } from '../hooks/useLocationWatch';
 
@@ -41,24 +42,24 @@ function StartSession({ courseId, onStarted }: { courseId: string; onStarted: (s
 
   return (
     <div className="space-y-4 text-center">
-      <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <div className="card p-6">
         {recentBest ? (
           <>
-            <div className={`text-5xl font-bold ${precise ? 'text-emerald-600' : 'text-amber-600'}`} dir="ltr">
+            <div className={`text-5xl font-bold ${precise ? 'text-good' : 'text-warn'}`} dir="ltr">
               ±{Math.round(recentBest.accuracy)} m
             </div>
-            <p className="mt-3 text-sm text-slate-600">
+            <p className="mt-3 text-sm text-ink-2">
               {precise ? 'המיקום מדויק מספיק — אפשר להתחיל.' : `ממתין למיקום מדויק… (כרגע: ${Math.round(recentBest.accuracy)} מ׳, נדרש עד ${MAX_ACC} מ׳)`}
             </p>
           </>
         ) : (
-          !geoError && <p className="py-4 text-slate-500">מאתר מיקום…</p>
+          !geoError && <p className="py-4 text-ink-3">מאתר מיקום…</p>
         )}
-        <p className="mt-1 text-xs text-slate-400">{count} קריאות</p>
+        <p className="mt-1 text-xs text-ink-4">{count} קריאות</p>
       </div>
 
       {!precise && !geoError && (
-        <p className="rounded-lg bg-slate-100 p-3 text-sm text-slate-700">
+        <p className="rounded-xl bg-surface-2 p-3 text-sm text-ink-2">
           {laptop
             ? 'למחשב נייד אין GPS: המיקום מחושב לפי רשתות Wi-Fi סביבכם ולכן לפעמים פחות מדויק. ודאו שה-Wi-Fi דלוק ושהדפדפן מורשה לגשת למיקום (הגדרות המערכת ← פרטיות ואבטחה ← שירותי מיקום).'
             : 'עמדו בתוך הכיתה, רצוי ליד שולחן המרצה. Wi-Fi דלוק משפר את הדיוק בתוך מבנים.'}
@@ -69,13 +70,13 @@ function StartSession({ courseId, onStarted }: { courseId: string; onStarted: (s
       <button type="button" onClick={start} disabled={!precise || busy} className={`${primaryButton} py-4 text-lg`}>
         {busy ? '…' : 'התחל נוכחות'}
       </button>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-3">
         המפגש יימשך {ATTENDANCE_RULES.defaultSessionMinutes} דקות, וניתן לסגור אותו מוקדם יותר.
       </p>
 
       {laptop && (
-        <details className="rounded-xl bg-white p-4 text-start shadow-sm ring-1 ring-slate-200" open={!!geoError}>
-          <summary className="cursor-pointer text-sm font-medium text-slate-700">המיקום במחשב לא מדויק? פתחו את הדף בטלפון</summary>
+        <details className="card p-4 text-start" open={!!geoError}>
+          <summary className="cursor-pointer text-sm font-medium text-ink-2">המיקום במחשב לא מדויק? פתחו את הדף בטלפון</summary>
           <div className="mt-3 text-center">
             <OpenOnPhoneQr />
           </div>
@@ -98,8 +99,11 @@ function LiveView({ sessionId }: { sessionId: string }) {
   const [error, setError] = useState('');
   const [closing, setClosing] = useState(false);
 
-  const apply = useCallback((s: SessionStatus) => {
+  const [manual, setManual] = useState(0);
+  const apply = useCallback((s: SessionStatus | Roster) => {
     setStatus(s);
+    // The roster (when it reports in) says who was marked by hand: amber dots.
+    if ('students' in s) setManual(s.students.filter((x) => x.present && x.source === 'manual').length);
     setClockOffset(new Date(s.serverNow).getTime() - Date.now());
     setError('');
   }, []);
@@ -132,37 +136,44 @@ function LiveView({ sessionId }: { sessionId: string }) {
     }
   }
 
-  if (!status) return <p className="text-center text-slate-500">{error || 'טוען…'}</p>;
+  if (!status) return <p className="text-center text-ink-3">{error || 'טוען…'}</p>;
 
   const { session, checkedInCount, rosterCount } = status;
   const msLeft = new Date(session.endsAt).getTime() - (now + clockOffset);
   const active = session.status === 'active' && msLeft > 0;
 
   return (
-    <div className="space-y-4 text-center">
-      <div className={`rounded-xl p-6 shadow-sm ring-1 ${active ? 'bg-white ring-emerald-200' : 'bg-slate-100 ring-slate-200'}`}>
-        <p className={`text-sm font-medium ${active ? 'text-emerald-700' : 'text-slate-600'}`}>
-          {active ? '● נוכחות פעילה' : 'המפגש נסגר'}
-        </p>
-        <div className="mt-2 text-6xl font-bold tabular-nums" dir="ltr">
-          {checkedInCount}
-          <span className="text-3xl text-slate-400">/{rosterCount}</span>
-        </div>
-        <p className="mt-1 text-sm text-slate-500">סימנו נוכחות</p>
-        {active && (
-          <p className="mt-4 text-lg tabular-nums" dir="ltr">
-            ⏱ {formatLeft(msLeft)}
+    <div className="space-y-4">
+      <section className="card space-y-5 p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <p className={`flex items-center gap-2 text-sm ${active ? 'text-good' : 'text-ink-3'}`}>
+            {active && <span className="h-2 w-2 rounded-full bg-good motion-safe:animate-pulse" />}
+            {active ? 'נוכחות פתוחה' : 'המפגש נסגר'}
           </p>
-        )}
-      </div>
+          {active && (
+            <p className="font-display text-xl tabular-nums" dir="ltr" aria-label="זמן שנותר">
+              {formatLeft(msLeft)}
+            </p>
+          )}
+        </div>
+        <DotGrid present={checkedInCount} manual={Math.min(manual, checkedInCount)} total={rosterCount} size="lg" />
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <p className="font-display text-5xl tabular-nums">
+            {checkedInCount}
+            <span className="text-2xl text-ink-3"> מתוך {rosterCount} סטודנטים</span>
+            <span className="mt-2 block font-sans text-sm text-ink-3">{active ? 'סימנו נוכחות עד עכשיו' : 'נכחו במפגש'}</span>
+          </p>
+          <DotLegend withManual={manual > 0} />
+        </div>
+      </section>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-3">
         רדיוס {session.radiusM} מ׳ · דיוק נקודת המרכז ±{Math.round(session.centerAccuracyM)} מ׳
       </p>
       <ErrorBox>{error}</ErrorBox>
 
       {active ? (
-        <button type="button" onClick={close} disabled={closing} className="w-full rounded-lg border-2 border-red-300 bg-white px-4 py-3 font-medium text-red-700 disabled:opacity-50">
+        <button type="button" onClick={close} disabled={closing} className="w-full rounded-xl border-2 border-bad/40 bg-surface-2 px-4 py-3 font-medium text-bad disabled:opacity-50">
           {closing ? '…' : 'סגור נוכחות'}
         </button>
       ) : (
@@ -192,15 +203,15 @@ function LastSessionLink({ courseId }: { courseId: string }) {
   return (
     <Link
       to={`/courses/${courseId}/sessions/${last.id}`}
-      className="flex items-center justify-between gap-3 rounded-xl bg-white p-4 text-start shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+      className="flex items-center justify-between gap-3 card p-4 text-start hover:bg-surface"
     >
       <span>
         <span className="block text-sm font-medium">המפגש האחרון · {lastWhen(last.startsAt)}</span>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-ink-3">
           {last.present}/{list.rosterCount} נוכחים · אפשר לסמן ולתקן נוכחות גם אחרי שנסגר
         </span>
       </span>
-      <span className="shrink-0 text-sm text-indigo-700">עריכה ←</span>
+      <span className="shrink-0 text-sm text-accent-ink">עריכה</span>
     </Link>
   );
 }
@@ -218,11 +229,9 @@ export default function LecturerAttendance() {
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <Link to={`/courses/${id}`} className="text-sm text-slate-500 hover:underline">
-        → חזרה לקורס
-      </Link>
+      <BackLink to={`/courses/${id}`}>חזרה לקורס</BackLink>
       <ErrorBox>{error}</ErrorBox>
-      {sessionId === undefined && !error && <p className="text-center text-slate-500">טוען…</p>}
+      {sessionId === undefined && !error && <p className="text-center text-ink-3">טוען…</p>}
       {sessionId === null && (
         <>
           <LocationGate purpose="מרכז הכיתה נקבע לפי המיקום שלך כשאת/ה פותח/ת נוכחות.">

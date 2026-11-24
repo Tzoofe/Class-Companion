@@ -28,7 +28,7 @@ overviewRouter.get('/me/overview', requireAuth, requireRole('lecturer'), async (
     Poll.find({ courseId: { $in: courseIds }, status: 'open' }, { courseId: 1, question: 1 }),
     Post.find({ courseId: { $in: courseIds }, kind: 'question', status: 'open', hidden: false }, { courseId: 1, text: 1, voterIds: 1, createdAt: 1 }),
   ]);
-  const attendance = await Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) }, ...PRESENT }, { sessionId: 1, email: 1 });
+  const attendance = await Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) }, ...PRESENT }, { sessionId: 1, email: 1, source: 1 });
   const pollAnswers = await PollResponse.aggregate<{ _id: unknown; n: number }>([
     { $match: { pollId: { $in: openPolls.map((p) => p._id) } } },
     { $group: { _id: '$pollId', n: { $sum: 1 } } },
@@ -37,22 +37,23 @@ overviewRouter.get('/me/overview', requireAuth, requireRole('lecturer'), async (
   const userList = users.map((u) => ({ id: u.id as string, email: u.email }));
   const name = new Map(courses.map((c) => [String(c._id), c.name]));
 
-  const liveSessions: { courseId: string; courseName: string; sessionId: string; present: number; rosterCount: number; endsAt: Date }[] = [];
+  const liveSessions: { courseId: string; courseName: string; sessionId: string; present: number; manual: number; rosterCount: number; endsAt: Date }[] = [];
   let weekPresent = 0;
   let weekPossible = 0;
 
   const courseCards = courses.map((c) => {
     const cs = sessions.filter((s) => String(s.courseId) === String(c._id));
     const ids = new Set(cs.map((s) => s.id as string));
-    const att = attendance.filter((a) => ids.has(String(a.sessionId))).map((a) => ({ sessionId: String(a.sessionId), email: a.email }));
+    const att = attendance.filter((a) => ids.has(String(a.sessionId))).map((a) => ({ sessionId: String(a.sessionId), email: a.email, source: a.source }));
     const d = buildDashboard({
       roster: c.roster.map((r) => ({ email: r.email, firstName: r.firstName, lastName: r.lastName })),
       users: userList,
       sessions: cs.map((s) => ({ id: s.id as string, status: s.status, startsAt: s.startsAt, endsAt: s.endsAt })),
       attendance: att,
       now,
+      attendanceRequired: c.attendanceRequired !== false,
     });
-    if (d.live) liveSessions.push({ courseId: c.id, courseName: c.name, sessionId: d.live.id, present: d.live.present, rosterCount: c.roster.length, endsAt: d.live.endsAt });
+    if (d.live) liveSessions.push({ courseId: c.id, courseName: c.name, sessionId: d.live.id, present: d.live.present, manual: d.live.manual, rosterCount: c.roster.length, endsAt: d.live.endsAt });
     for (const h of d.history) {
       if (now.getTime() - h.startsAt.getTime() <= WEEK_MS) {
         weekPresent += h.present;
@@ -66,7 +67,9 @@ overviewRouter.get('/me/overview', requireAuth, requireRole('lecturer'), async (
       registeredCount: d.registeredCount,
       sessionCount: d.sessionCount,
       averagePercent: d.averagePercent,
-      lastSession: d.lastSession && { startsAt: d.lastSession.startsAt, present: d.lastSession.present },
+      lastSession: d.lastSession && { startsAt: d.lastSession.startsAt, present: d.lastSession.present, manual: d.lastSession.manual },
+      live: d.live && { present: d.live.present, manual: d.live.manual },
+      attendanceRequired: c.attendanceRequired !== false,
       trend: d.history.slice(-TREND_SESSIONS).map((h) => (c.roster.length ? Math.round((h.present / c.roster.length) * 100) : 0)),
       openQuestions: openQuestions.filter((p) => String(p.courseId) === String(c._id)).length,
       pollOpen: openPolls.some((p) => String(p.courseId) === String(c._id)),

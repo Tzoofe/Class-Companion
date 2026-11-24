@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { WEEKDAYS_HE, type Agenda, type AgendaItem } from '../api';
+import { IconPin } from './icons';
 
 export const KIND_HE: Record<AgendaItem['kind'], string> = {
   class: 'שיעור',
@@ -36,25 +37,25 @@ function ItemRow({ item, now, action, showCourse }: { item: AgendaItem; now: Age
   const t = timing(item, now);
   const label = item.kind === 'class' ? item.title || KIND_HE.class : item.title || KIND_HE[item.kind];
   return (
-    <li className={`flex items-start gap-3 px-4 py-3 ${t === 'now' && !item.cancelled ? 'bg-emerald-50' : ''} ${t === 'past' ? 'opacity-60' : ''}`}>
-      <div className="w-24 shrink-0 text-sm tabular-nums text-slate-600" dir="ltr">
+    <li className={`flex items-start gap-3 px-4 py-3 ${t === 'now' && !item.cancelled ? 'bg-good-soft' : ''} ${t === 'past' ? 'opacity-60' : ''}`}>
+      <div className="w-24 shrink-0 text-sm tabular-nums text-ink-2" dir="ltr">
         {item.start}
         {item.end && `–${item.end}`}
       </div>
       <div className="min-w-0 flex-1">
-        <div className={`font-medium ${item.cancelled ? 'text-slate-400 line-through' : ''}`}>
+        <div className={`font-medium ${item.cancelled ? 'text-ink-4 line-through' : ''}`}>
           {showCourse && <span>{item.courseName}</span>}
-          {showCourse && label && <span className="text-slate-500"> · </span>}
-          <span className={showCourse ? 'font-normal text-slate-700' : ''}>{label}</span>
+          {showCourse && label && <span className="text-ink-3"> · </span>}
+          <span className={showCourse ? 'font-normal text-ink-2' : ''}>{label}</span>
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
-          {item.cancelled && <span className="rounded bg-red-50 px-1.5 py-0.5 font-medium text-red-700">✕ בוטל</span>}
-          {!item.cancelled && t === 'now' && <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-800">● עכשיו</span>}
-          {!item.cancelled && t === 'soon' && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-800">בקרוב</span>}
-          {item.kind !== 'class' && <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-700">{KIND_HE[item.kind]}</span>}
-          {item.place && <span>📍 {item.place}</span>}
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
+          {item.cancelled && <span className="rounded bg-bad-soft px-1.5 py-0.5 font-medium text-bad">✕ בוטל</span>}
+          {!item.cancelled && t === 'now' && <span className="rounded bg-good-soft px-1.5 py-0.5 font-medium text-good">● עכשיו</span>}
+          {!item.cancelled && t === 'soon' && <span className="rounded bg-warn-soft px-1.5 py-0.5 text-warn">בקרוב</span>}
+          {item.kind !== 'class' && <span className="rounded bg-accent-soft px-1.5 py-0.5 text-accent-ink">{KIND_HE[item.kind]}</span>}
+          {item.place && <span className="inline-flex items-center gap-1"><IconPin />{item.place}</span>}
           {item.link && (
-            <a href={item.link} target="_blank" rel="noreferrer" className="text-indigo-700 underline">
+            <a href={item.link} target="_blank" rel="noreferrer" className="text-accent-ink underline">
               קישור
             </a>
           )}
@@ -84,11 +85,11 @@ export default function AgendaList({
   return (
     <div className="space-y-3">
       {[...byDay].map(([date, items]) => (
-        <section key={date} className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-          <h3 className={`border-b border-slate-100 px-4 py-2 text-sm font-semibold ${date === agenda.now.date ? 'bg-indigo-50 text-indigo-900' : 'bg-slate-50 text-slate-700'}`}>
+        <section key={date} className="overflow-hidden card">
+          <h3 className={`border-b border-line px-4 py-2 text-sm ${date === agenda.now.date ? 'bg-accent-soft text-accent-ink' : 'bg-surface text-ink-2'}`}>
             {dayLabel(date, agenda.now.date)}
           </h3>
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line">
             {items.map((item, i) => (
               <ItemRow key={`${item.courseId}-${item.slotId ?? item.eventId}-${i}`} item={item} now={agenda.now} showCourse={showCourse} action={action?.(item)} />
             ))}
@@ -103,7 +104,7 @@ export function LinkButton({ to, children, tone = 'primary' }: { to: string; chi
   return (
     <Link
       to={to}
-      className={`inline-block rounded-lg px-3 py-1.5 text-sm font-medium text-white ${tone === 'live' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+      className={`inline-block rounded-full px-3.5 py-1.5 text-sm font-medium text-white transition hover:brightness-110 ${tone === 'live' ? 'bg-good-strong' : 'btn-primary'}`}
     >
       {children}
     </Link>

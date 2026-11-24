@@ -66,9 +66,11 @@ export interface DashboardInput {
   roster: { email: string; firstName: string; lastName: string }[];
   users: { id: string; email: string }[];
   sessions: { id: string; status: string; startsAt: Date; endsAt: Date }[];
-  /** Present records only, keyed by roster email. */
-  attendance: { sessionId: string; email: string }[];
+  /** Present records only, keyed by roster email. `source: 'manual'` = marked by the lecturer. */
+  attendance: { sessionId: string; email: string; source?: string }[];
   now: Date;
+  /** When attendance isn't mandatory, no student is flagged for low attendance. Default true. */
+  attendanceRequired?: boolean;
 }
 
 export const DASHBOARD = {
@@ -83,7 +85,7 @@ export const DASHBOARD = {
  * Course dashboard numbers. Rates use finished sessions only, so an open session
  * doesn't drag everyone's percentage down while students are still checking in.
  */
-export function buildDashboard({ roster, users, sessions, attendance, now }: DashboardInput) {
+export function buildDashboard({ roster, users, sessions, attendance, now, attendanceRequired = true }: DashboardInput) {
   const rosterCount = roster.length;
   const userIdByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
   const active = sessions.find((s) => isSessionActive(s, now)) ?? null;
@@ -93,19 +95,21 @@ export function buildDashboard({ roster, users, sessions, attendance, now }: Das
   const finishedIds = new Set(finished.map((s) => s.id));
 
   const presentBySession = new Map<string, number>();
+  const manualBySession = new Map<string, number>();
   const attendedByStudent = new Map<string, number>();
   for (const a of attendance) {
     presentBySession.set(a.sessionId, (presentBySession.get(a.sessionId) ?? 0) + 1);
+    if (a.source === 'manual') manualBySession.set(a.sessionId, (manualBySession.get(a.sessionId) ?? 0) + 1);
     const key = a.email.toLowerCase();
     if (finishedIds.has(a.sessionId)) attendedByStudent.set(key, (attendedByStudent.get(key) ?? 0) + 1);
   }
 
   const pct = (part: number, whole: number) => (whole === 0 ? null : Math.round((part / whole) * 100));
-  const history = finished.map((s) => ({ id: s.id, startsAt: s.startsAt, present: presentBySession.get(s.id) ?? 0 }));
+  const history = finished.map((s) => ({ id: s.id, startsAt: s.startsAt, present: presentBySession.get(s.id) ?? 0, manual: manualBySession.get(s.id) ?? 0 }));
   const totalPresent = history.reduce((sum, s) => sum + s.present, 0);
 
   const atRisk =
-    finished.length === 0
+    finished.length === 0 || !attendanceRequired
       ? []
       : roster
           .map((r) => {
@@ -123,10 +127,11 @@ export function buildDashboard({ roster, users, sessions, attendance, now }: Das
     finishedSessionCount: finished.length,
     averagePercent: pct(totalPresent, finished.length * rosterCount),
     lastSession: last,
-    live: active ? { id: active.id, endsAt: active.endsAt, present: presentBySession.get(active.id) ?? 0 } : null,
+    live: active ? { id: active.id, endsAt: active.endsAt, present: presentBySession.get(active.id) ?? 0, manual: manualBySession.get(active.id) ?? 0 } : null,
     history: history.slice(-DASHBOARD.chartSessions),
     atRisk: atRisk.slice(0, DASHBOARD.atRiskLimit),
     atRiskCount: atRisk.length,
     atRiskThreshold: DASHBOARD.atRiskPercent,
+    attendanceRequired,
   };
 }

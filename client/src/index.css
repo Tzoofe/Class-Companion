@@ -1,1 +1,149 @@
 @import "tailwindcss";
+
+/*
+ * Design tokens — the whole palette lives here. To re-theme the app, change these values only.
+ * Pages use the semantic names (bg-surface, text-ink-2, ring-line, bg-accent, text-good …),
+ * never raw palette colors.
+ */
+@theme {
+  --font-sans: "IBM Plex Sans Hebrew", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Headings and numbers: one weight, strong character. */
+  --font-display: "Secular One", "IBM Plex Sans Hebrew", ui-sans-serif, system-ui, sans-serif;
+
+  /* Dark theme (default). Light values are below under [data-theme="light"]. */
+  --color-bg: #15131c; /* paper */
+  --color-surface: #1e1b27; /* slate: panels */
+  --color-elevated: #262232; /* tooltips, menus */
+  --color-surface-2: #272333; /* inputs, chips, secondary buttons */
+  --color-surface-3: #322d40;
+  --color-line: #2c2838;
+  --color-line-strong: #3d384c;
+
+  /* Text (chalk) */
+  --color-ink: #ece9f5;
+  --color-ink-2: #c6c1d6;
+  --color-ink-3: #948fa8;
+  --color-ink-4: #6c677e;
+
+  /* Violet: present, main actions */
+  --color-accent: #7c5cff;
+  --color-accent-strong: #6a47f5;
+  --color-accent-soft: rgb(124 92 255 / 0.16);
+  --color-accent-ink: #b9a8ff;
+
+  /* Absent seats in the class grid */
+  --color-absent: #4a4558;
+
+  /* Status: always paired with an icon or label, never color alone */
+  --color-good: #4ade80;
+  --color-good-soft: rgb(74 222 128 / 0.12);
+  --color-good-strong: #16a34a;
+  --color-warn: #f5b544; /* amber: manual marks, warnings */
+  --color-warn-soft: rgb(245 181 68 / 0.14);
+  --color-bad: #f87171;
+  --color-bad-soft: rgb(248 113 113 / 0.12);
+  --color-info: #7dd3fc;
+  --color-info-soft: rgb(125 211 252 / 0.12);
+
+  --radius-card: 1.25rem;
+}
+
+/* Light theme: same names, light values. Toggled by the header button (see src/theme.ts). */
+:root[data-theme="light"] {
+  --color-bg: #f7f6fa;
+  --color-surface: #ffffff;
+  --color-elevated: #ffffff;
+  --color-surface-2: #f0eef6;
+  --color-surface-3: #e4e1ee;
+  --color-line: #e6e3ee;
+  --color-line-strong: #d0cbdd;
+
+  --color-ink: #1a1724;
+  --color-ink-2: #3d384d;
+  --color-ink-3: #676279;
+  --color-ink-4: #938ea5;
+
+  --color-accent: #6b46f2;
+  --color-accent-strong: #5a34e0;
+  --color-accent-soft: rgb(107 70 242 / 0.1);
+  --color-accent-ink: #5a34e0;
+
+  --color-absent: #cbc6d9;
+
+  --color-good: #15803d;
+  --color-good-soft: rgb(22 163 74 / 0.1);
+  --color-good-strong: #16a34a;
+  --color-warn: #b7791f;
+  --color-warn-soft: rgb(245 158 11 / 0.14);
+  --color-bad: #b91c1c;
+  --color-bad-soft: rgb(239 68 68 / 0.1);
+  --color-info: #0369a1;
+  --color-info-soft: rgb(14 165 233 / 0.1);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark; /* native date/time pickers, selects and scrollbars follow the theme */
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: rgb(124 92 255 / 0.35);
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 400; /* Secular One has a single weight; never fake-bold it */
+    letter-spacing: 0;
+  }
+
+  /* Visible keyboard focus everywhere */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Flat "bubble" card */
+  .card {
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
+  :root[data-theme="light"] .card {
+    box-shadow:
+      inset 0 0 0 1px var(--color-line),
+      0 1px 2px rgb(23 20 31 / 0.04);
+  }
+
+  /* Small tinted square holding an icon */
+  .icon-tile {
+    display: inline-grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.625rem;
+    background: var(--color-surface-2);
+    font-size: 1.05rem;
+  }
+
+  /* Primary pill button (flat violet) */
+  .btn-primary {
+    background: var(--color-accent);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-accent-strong);
+  }
+}

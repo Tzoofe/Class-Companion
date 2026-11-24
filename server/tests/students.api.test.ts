@@ -129,3 +129,26 @@ describe('GET /api/courses/:id/dashboard', () => {
     expect((await dashboard(course.id, student)).status).toBe(403);
   });
 });
+
+describe('mandatory attendance setting', () => {
+  it('defaults to mandatory, can be turned off, and then nobody needs attention', async () => {
+    const { course } = await setup();
+    await makeSession(course._id, 'closed', -60);
+    const lect = { Authorization: `Bearer ${await loginToken('lect@uni.ac.il')}` };
+    const dash = () => api().get(`/api/courses/${course.id}/dashboard`).set(lect);
+    const overview = () => api().get('/api/me/overview').set(lect);
+
+    expect((await dash()).body).toMatchObject({ attendanceRequired: true, atRiskCount: 3 });
+    expect((await overview()).body.attention.atRisk).toHaveLength(1);
+
+    const off = await api().patch(`/api/courses/${course.id}`).set(lect).send({ attendanceRequired: false });
+    expect(off.body.course.attendanceRequired).toBe(false);
+    expect((await dash()).body).toMatchObject({ attendanceRequired: false, atRisk: [], atRiskCount: 0 });
+    const o = (await overview()).body;
+    expect(o.attention.atRisk).toEqual([]);
+    expect(o.courses[0]).toMatchObject({ attendanceRequired: false, atRiskCount: 0 });
+    expect((await api().get('/api/courses').set(lect)).body.courses[0].attendanceRequired).toBe(false);
+
+    expect((await api().patch(`/api/courses/${course.id}`).set(lect).send({ attendanceRequired: 'no' })).status).toBe(400);
+  });
+});

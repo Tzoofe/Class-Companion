@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, type CourseStudents, type StudentRow } from '../api';
-import { ErrorBox } from '../components/ui';
+import { ErrorBox, BackLink } from '../components/ui';
 
 const dateTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
 function percentClass(p: number | null) {
-  if (p === null) return 'text-slate-400';
-  if (p >= 80) return 'text-emerald-700';
-  if (p >= 50) return 'text-amber-700';
-  return 'text-red-700';
+  if (p === null) return 'text-ink-4';
+  if (p >= 80) return 'text-good';
+  if (p >= 50) return 'text-warn';
+  return 'text-bad';
 }
 
 function Attendance({ s }: { s: StudentRow }) {
@@ -23,15 +23,15 @@ function Attendance({ s }: { s: StudentRow }) {
 
 function AccountBadge({ registered }: { registered: boolean }) {
   return registered ? (
-    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">רשום/ה</span>
+    <span className="rounded-full bg-good-soft px-2 py-0.5 text-xs text-good">רשום/ה</span>
   ) : (
-    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">לא נרשם/ה</span>
+    <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs text-warn">לא נרשם/ה</span>
   );
 }
 
 function PresentNow({ value }: { value: boolean | null }) {
   if (value === null) return null;
-  return value ? <span className="font-medium text-emerald-700">✓ נוכח/ת</span> : <span className="text-slate-400">— עדיין לא</span>;
+  return value ? <span className="font-medium text-good">✓ נוכח/ת</span> : <span className="text-ink-4">— עדיין לא</span>;
 }
 
 export default function CourseStudents() {
@@ -56,12 +56,12 @@ export default function CourseStudents() {
     return (
       <div className="space-y-3">
         <ErrorBox>{error}</ErrorBox>
-        <Link to={`/courses/${id}`} className="text-sm text-indigo-700 underline">
+        <Link to={`/courses/${id}`} className="text-sm text-accent-ink underline">
           חזרה לקורס
         </Link>
       </div>
     );
-  if (!data) return <p className="text-slate-500">טוען…</p>;
+  if (!data) return <p className="text-ink-3">טוען…</p>;
 
   const { course } = data;
   const live = course.activeSessionId !== null;
@@ -69,17 +69,15 @@ export default function CourseStudents() {
   return (
     <div className="space-y-4">
       <div>
-        <Link to={`/courses/${course.id}`} className="text-sm text-slate-500 hover:underline">
-          → {course.name}
-        </Link>
-        <h1 className="mt-1 text-xl font-bold">סטודנטים</h1>
-        <p className="text-sm text-slate-500">
+        <BackLink to={`/courses/${course.id}`}>{course.name}</BackLink>
+        <h1 className="mt-1 text-xl">סטודנטים</h1>
+        <p className="text-sm text-ink-3">
           {course.rosterCount} ברשימה · {course.registeredCount} נרשמו לאפליקציה · {course.sessionCount} מפגשים
         </p>
       </div>
 
       {live && (
-        <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+        <p className="rounded-xl bg-good-soft p-3 text-sm text-good">
           מפגש נוכחות פעיל — {data.students.filter((s) => s.presentNow).length} נוכחים כרגע
         </p>
       )}
@@ -89,21 +87,21 @@ export default function CourseStudents() {
         placeholder="חיפוש לפי שם או אימייל"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+        className="w-full rounded-xl border border-line-strong bg-surface-2 px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
       />
 
-      {students.length === 0 && <p className="py-6 text-center text-slate-500">לא נמצאו סטודנטים</p>}
+      {students.length === 0 && <p className="py-6 text-center text-ink-3">לא נמצאו סטודנטים</p>}
 
       {/* Phones: cards */}
       <ul className="space-y-2 sm:hidden">
         {students.map((s) => (
-          <li key={s.email} className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+          <li key={s.email} className="card p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="font-medium">
                   {s.lastName} {s.firstName}
                 </div>
-                <div className="truncate text-xs text-slate-500" dir="ltr">
+                <div className="truncate text-xs text-ink-3" dir="ltr">
                   {s.email}
                 </div>
               </div>
@@ -113,7 +111,7 @@ export default function CourseStudents() {
               <span>
                 נוכחות: <Attendance s={s} />
               </span>
-              <span className="text-slate-500">נראה לאחרונה: {dateTime(s.lastSeenAt)}</span>
+              <span className="text-ink-3">נראה לאחרונה: {dateTime(s.lastSeenAt)}</span>
               <PresentNow value={s.presentNow} />
             </div>
           </li>
@@ -122,9 +120,9 @@ export default function CourseStudents() {
 
       {/* Laptop: table */}
       {students.length > 0 && (
-        <div className="hidden overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-slate-200 sm:block">
+        <div className="hidden overflow-x-auto card sm:block">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500">
+            <thead className="bg-surface text-ink-3">
               <tr>
                 {['שם משפחה', 'שם פרטי', 'אימייל', 'חשבון', 'נוכחות', 'נראה לאחרונה', ...(live ? ['בשיעור הנוכחי'] : [])].map((h) => (
                   <th key={h} className="px-3 py-2 text-start font-medium">
@@ -135,10 +133,10 @@ export default function CourseStudents() {
             </thead>
             <tbody>
               {students.map((s) => (
-                <tr key={s.email} className="border-t border-slate-100">
+                <tr key={s.email} className="border-t border-line">
                   <td className="px-3 py-2 font-medium">{s.lastName}</td>
                   <td className="px-3 py-2">{s.firstName}</td>
-                  <td className="px-3 py-2 text-slate-600">
+                  <td className="px-3 py-2 text-ink-2">
                     <span dir="ltr">{s.email}</span>
                   </td>
                   <td className="px-3 py-2">
@@ -147,7 +145,7 @@ export default function CourseStudents() {
                   <td className="px-3 py-2">
                     <Attendance s={s} />
                   </td>
-                  <td className="px-3 py-2 text-slate-600">{dateTime(s.lastSeenAt)}</td>
+                  <td className="px-3 py-2 text-ink-2">{dateTime(s.lastSeenAt)}</td>
                   {live && (
                     <td className="px-3 py-2">
                       <PresentNow value={s.presentNow} />

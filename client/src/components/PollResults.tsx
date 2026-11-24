@@ -22,16 +22,16 @@ function Bar({ label, count, total, correct, mine, large }: { label: string; cou
       <div className={`flex items-baseline justify-between gap-3 ${large ? 'text-2xl lg:text-3xl' : 'text-sm'}`}>
         <span className="min-w-0 break-words">
           {label}
-          {correct && <span className={`ms-2 font-medium ${large ? 'text-emerald-300' : 'text-emerald-700'}`}>✓ נכון</span>}
-          {mine && <span className={`ms-2 ${large ? 'text-slate-300' : 'text-slate-500'} text-xs`}>(הבחירה שלך)</span>}
+          {correct && <span className={`ms-2 font-medium ${large ? 'text-good' : 'text-good'}`}>✓ נכון</span>}
+          {mine && <span className={`ms-2 text-ink-3 text-xs`}>(הבחירה שלך)</span>}
         </span>
         <span className="shrink-0 tabular-nums">
-          {count} <span className={large ? 'text-slate-400' : 'text-slate-500'}>· {p}%</span>
+          {count} <span className={large ? 'text-ink-4' : 'text-ink-3'}>· {p}%</span>
         </span>
       </div>
-      <div className={`mt-1 w-full overflow-hidden rounded-full ${large ? 'h-6 bg-slate-700' : 'h-2.5 bg-slate-100'}`}>
+      <div className={`mt-1 w-full overflow-hidden rounded-full ${large ? 'h-6 bg-surface-3' : 'h-2.5 bg-surface-2'}`}>
         <div
-          className={`h-full rounded-full transition-[width] duration-500 ${correct ? 'bg-emerald-500' : large ? 'bg-indigo-400' : 'bg-indigo-500'}`}
+          className={`h-full rounded-full transition-[width] duration-500 ${correct ? 'bg-good' : 'bg-accent'}`}
           style={{ width: `${p}%` }}
         />
       </div>
@@ -63,7 +63,7 @@ export default function PollResults({ type, options, results, correctOptionIds =
   if (results.scale) {
     return (
       <div className={large ? 'space-y-5' : 'space-y-2.5'}>
-        <p className={large ? 'text-3xl' : 'text-sm text-slate-600'}>
+        <p className={large ? 'text-3xl' : 'text-sm text-ink-2'}>
           ממוצע: <strong className="tabular-nums">{results.scale.average ?? '—'}</strong> / 5
         </p>
         <ul className={large ? 'space-y-4' : 'space-y-2'}>
@@ -75,12 +75,12 @@ export default function PollResults({ type, options, results, correctOptionIds =
     );
   }
   if (type === 'text') {
-    if (!showTexts) return <p className={large ? 'text-3xl' : 'text-sm text-slate-600'}>{total} תשובות</p>;
-    if (!results.texts?.length) return <p className={large ? 'text-2xl text-slate-400' : 'text-sm text-slate-500'}>עוד אין תשובות.</p>;
+    if (!showTexts) return <p className={large ? 'text-3xl' : 'text-sm text-ink-2'}>{total} תשובות</p>;
+    if (!results.texts?.length) return <p className={large ? 'text-2xl text-ink-4' : 'text-sm text-ink-3'}>עוד אין תשובות.</p>;
     return (
       <ul className={large ? 'grid gap-3 lg:grid-cols-2' : 'space-y-1.5'}>
         {results.texts.map((t, i) => (
-          <li key={i} className={large ? 'rounded-xl bg-slate-800 p-4 text-2xl' : 'rounded-lg bg-slate-50 px-3 py-2 text-sm'}>
+          <li key={i} className={large ? 'rounded-2xl bg-elevated p-4 text-2xl' : 'rounded-xl bg-surface px-3 py-2 text-sm'}>
             {t}
           </li>
         ))}

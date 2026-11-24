@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { isIOS, isStandalone } from '../push';
+import { IconPin } from './icons';
 
 /** Accuracy worse than this almost always means "Precise Location" is off (the phone reports a ~km area). */
 export const APPROXIMATE_LOCATION_M = 1000;
@@ -66,7 +67,7 @@ export function LocationHelp({ kind }: { kind: 'denied' | 'approximate' }) {
     steps = ['אפשרו גישה למיקום לאתר הזה בהגדרות הדפדפן (סמל המנעול ליד הכתובת), ורעננו את הדף.'];
   }
   return (
-    <div className="rounded-xl bg-amber-50 p-5 text-amber-900 ring-1 ring-amber-200">
+    <div className="rounded-2xl bg-warn-soft p-5 text-warn ring-1 ring-warn/30">
       <p className="text-lg font-semibold">{title}</p>
       <p className="mt-1 text-sm">
         {kind === 'denied'
@@ -122,21 +123,21 @@ export default function LocationGate({ children, purpose }: { children: ReactNod
   }
 
   if (permission === 'granted') return <>{children}</>;
-  if (permission === 'checking') return <p className="py-10 text-center text-slate-500">בודק הרשאת מיקום…</p>;
+  if (permission === 'checking') return <p className="py-10 text-center text-ink-3">בודק הרשאת מיקום…</p>;
   if (permission === 'denied') return <LocationHelp kind="denied" />;
   return (
-    <div className="space-y-4 rounded-xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200">
-      <p className="text-4xl">📍</p>
-      <p className="text-sm leading-relaxed text-slate-600">{purpose}</p>
+    <div className="space-y-4 card p-6 text-center">
+      <span className="icon-tile mx-auto !h-12 !w-12 text-2xl text-accent-ink"><IconPin /></span>
+      <p className="text-sm leading-relaxed text-ink-2">{purpose}</p>
       <button
         type="button"
         onClick={ask}
         disabled={asking}
-        className="w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+        className="w-full btn-primary rounded-full px-4 py-3 font-medium text-white hover:brightness-110 disabled:opacity-60"
       >
         {asking ? 'ממתין לאישור…' : 'אפשרו גישה למיקום'}
       </button>
-      <p className="text-xs text-slate-500">בחלון שייפתח בחרו "אפשר" (ובאייפון השאירו "מיקום מדויק" מופעל).</p>
+      <p className="text-xs text-ink-3">בחלון שייפתח בחרו "אפשר" (ובאייפון השאירו "מיקום מדויק" מופעל).</p>
     </div>
   );
 }

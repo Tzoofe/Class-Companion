@@ -78,6 +78,7 @@ const HEBREW_ERRORS: Record<string, string> = {
   'That class is already cancelled': 'השיעור הזה כבר בוטל',
   'Event not found': 'האירוע לא נמצא',
   'Student already on roster': 'הסטודנט/ית כבר ברשימה',
+  'Invalid setting': 'הגדרה לא תקינה',
 };
 
 export class ApiError extends Error {
@@ -208,11 +209,13 @@ export interface CourseDashboard {
   finishedSessionCount: number;
   /** Over finished sessions; null when none yet. */
   averagePercent: number | null;
-  lastSession: { id: string; startsAt: string; present: number } | null;
-  live: { id: string; endsAt: string; present: number } | null;
-  history: { id: string; startsAt: string; present: number }[];
+  lastSession: { id: string; startsAt: string; present: number; manual: number } | null;
+  live: { id: string; endsAt: string; present: number; manual: number } | null;
+  history: { id: string; startsAt: string; present: number; manual: number }[];
   atRisk: { email: string; firstName: string; lastName: string; attended: number; percent: number }[];
   atRiskThreshold: number;
+  atRiskCount: number;
+  attendanceRequired: boolean;
   feed: { openQuestions: number; totalPosts: number };
   polls: { open: { id: string; question: string } | null; total: number };
 }
@@ -380,6 +383,7 @@ export interface CourseSettings {
   id: string;
   name: string;
   defaultRadiusM: number;
+  attendanceRequired: boolean;
   roster: RosterMember[];
 }
 
@@ -443,7 +447,7 @@ export interface Agenda {
 
 export interface LecturerOverview {
   live: {
-    sessions: { courseId: string; courseName: string; sessionId: string; present: number; rosterCount: number; endsAt: string }[];
+    sessions: { courseId: string; courseName: string; sessionId: string; present: number; manual: number; rosterCount: number; endsAt: string }[];
     polls: { courseId: string; courseName: string; pollId: string; question: string; responses: number }[];
   };
   totals: { courses: number; students: number; openQuestions: number; weekAttendancePercent: number | null };
@@ -458,7 +462,9 @@ export interface LecturerOverview {
     registeredCount: number;
     sessionCount: number;
     averagePercent: number | null;
-    lastSession: { startsAt: string; present: number } | null;
+    lastSession: { startsAt: string; present: number; manual: number } | null;
+    live: { present: number; manual: number } | null;
+    attendanceRequired: boolean;
     trend: number[];
     openQuestions: number;
     pollOpen: boolean;

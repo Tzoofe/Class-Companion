@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useParams } from 'react-router-dom';
 import { api, POST_MAX_LENGTH, type CourseFeed as Feed, type FeedPost, type PostKind } from '../api';
 import { useAuth } from '../auth';
+import { IconLightbulb, IconQuestion } from '../components/icons';
 import StudentCourseTabs from '../components/StudentCourseTabs';
-import { ErrorBox } from '../components/ui';
+import { ErrorBox, BackLink } from '../components/ui';
 import { dropQueued, enqueue, flush, isTransient, newClientId, queued, sendPost, type QueuedPost } from '../outbox';
 
 const POLL_MS = 5000;
 const KIND = {
-  question: { icon: '❓', label: 'שאלה' },
-  suggestion: { icon: '💡', label: 'הצעה' },
+  question: { icon: <IconQuestion />, label: 'שאלה' },
+  suggestion: { icon: <IconLightbulb />, label: 'הצעה' },
 } as const;
 
 const rtf = new Intl.RelativeTimeFormat('he', { numeric: 'auto' });
@@ -35,13 +36,13 @@ function sortPosts(posts: FeedPost[], sort: Sort) {
 
 function Segmented<T extends string>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
   return (
-    <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm">
+    <div className="inline-flex rounded-xl bg-surface-2 p-0.5 text-sm">
       {options.map(([v, label]) => (
         <button
           key={v}
           type="button"
           onClick={() => onChange(v)}
-          className={`rounded-md px-3 py-1 ${value === v ? 'bg-white font-medium shadow-sm' : 'text-slate-600'}`}
+          className={`rounded-md px-3 py-1 ${value === v ? 'bg-surface-2 font-medium ' : 'text-ink-2'}`}
         >
           {label}
         </button>
@@ -84,13 +85,13 @@ function Composer({ courseId, userId, onQueued, onSent }: { courseId: string; us
 
   const left = POST_MAX_LENGTH - text.length;
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <form onSubmit={submit} className="space-y-3 card p-4">
       <Segmented
         value={kind}
         onChange={setKind}
         options={[
-          ['question', `${KIND.question.icon} שאלה`],
-          ['suggestion', `${KIND.suggestion.icon} הצעה`],
+          ['question', 'שאלה'],
+          ['suggestion', 'הצעה'],
         ]}
       />
       <textarea
@@ -98,17 +99,17 @@ function Composer({ courseId, userId, onQueued, onSent }: { courseId: string; us
         onChange={(e) => setText(e.target.value.slice(0, POST_MAX_LENGTH))}
         rows={3}
         placeholder={kind === 'question' ? 'מה לא ברור? שאלו כאן — גם באמצע השיעור' : 'הצעה לשיפור הקורס או השיעור'}
-        className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+        className="w-full resize-y rounded-xl border border-line-strong bg-surface-2 px-3 py-2.5 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-ink-2">
           <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} className="h-4 w-4" />
           פרסום אנונימי
-          <span className="text-xs text-slate-500">(המרצה עדיין יראה את שמך)</span>
+          <span className="text-xs text-ink-3">(המרצה עדיין יראה את שמך)</span>
         </label>
         <span className="flex items-center gap-3">
-          <span className={`text-xs tabular-nums ${left < 50 ? 'text-amber-700' : 'text-slate-400'}`}>{left}</span>
-          <button type="submit" disabled={busy || !text.trim()} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+          <span className={`text-xs tabular-nums ${left < 50 ? 'text-warn' : 'text-ink-4'}`}>{left}</span>
+          <button type="submit" disabled={busy || !text.trim()} className="btn-primary rounded-full px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50">
             {busy ? '…' : 'שליחה'}
           </button>
         </span>
@@ -120,11 +121,11 @@ function Composer({ courseId, userId, onQueued, onSent }: { courseId: string; us
 
 function QueuedItem({ q, onDrop }: { q: QueuedPost; onDrop: () => void }) {
   return (
-    <li className="rounded-xl border border-dashed border-slate-300 bg-white/70 p-4">
-      <p className="whitespace-pre-wrap text-slate-700">
-        {KIND[q.kind].icon} {q.text}
+    <li className="rounded-2xl border border-dashed border-line-strong bg-surface p-4">
+      <p className="whitespace-pre-wrap text-ink-2">
+        {q.text}
       </p>
-      <p className={`mt-2 text-xs ${q.error ? 'text-red-700' : 'text-slate-500'}`}>
+      <p className={`mt-2 text-xs ${q.error ? 'text-bad' : 'text-ink-3'}`}>
         {q.error ? `לא נשלח: ${q.error}` : '⏳ ממתין לחיבור — יישלח אוטומטית'}
         <button type="button" onClick={onDrop} className="ms-3 underline">
           מחיקה
@@ -163,32 +164,32 @@ function PostCard({ p, lecturer, onChange, onRemove }: { p: FeedPost; lecturer: 
   }
 
   return (
-    <li className={`rounded-xl bg-white p-4 shadow-sm ring-1 ${p.pinned ? 'ring-indigo-300' : 'ring-slate-200'} ${p.hidden ? 'opacity-60' : ''}`}>
+    <li className={`card p-4 ring-1 ${p.pinned ? 'ring-accent/50' : 'ring-line'} ${p.hidden ? 'opacity-60' : ''}`}>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
-            <span className="font-medium text-slate-700">
-              {KIND[p.kind].icon} {KIND[p.kind].label}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
+            <span className="font-medium text-ink-2">
+              <span className="inline-flex items-center gap-1">{KIND[p.kind].icon} {KIND[p.kind].label}</span>
             </span>
             <span>· {p.author ?? 'סטודנט/ית אנונימי/ת'}</span>
-            {p.anonymous && (lecturer || p.mine) && <span className="rounded bg-slate-100 px-1.5 py-0.5">אנונימי לסטודנטים</span>}
+            {p.anonymous && (lecturer || p.mine) && <span className="rounded bg-surface-2 px-1.5 py-0.5">אנונימי לסטודנטים</span>}
             <span>· {ago(p.createdAt)}</span>
-            {p.duringClass && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">בזמן שיעור</span>}
-            {p.pinned && <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-700">📌 נעוץ</span>}
-            {p.status === 'answered' && <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">✓ נענה</span>}
-            {p.hidden && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-800">מוסתר מהסטודנטים</span>}
+            {p.duringClass && <span className="rounded bg-info-soft px-1.5 py-0.5 text-info">בזמן שיעור</span>}
+            {p.pinned && <span className="rounded-lg bg-accent-soft px-1.5 py-0.5 text-accent-ink">נעוץ</span>}
+            {p.status === 'answered' && <span className="rounded bg-good-soft px-1.5 py-0.5 text-good">✓ נענה</span>}
+            {p.hidden && <span className="rounded bg-warn-soft px-1.5 py-0.5 text-warn">מוסתר מהסטודנטים</span>}
           </div>
           <p className="mt-1.5 whitespace-pre-wrap break-words">{p.text}</p>
           {p.reply && !replying && (
-            <div className="mt-3 rounded-lg bg-indigo-50 p-3 text-sm">
-              <span className="font-medium text-indigo-800">תגובת המרצה: </span>
+            <div className="mt-3 rounded-xl bg-accent-soft p-3 text-sm">
+              <span className="font-medium text-accent-ink">תגובת המרצה: </span>
               <span className="whitespace-pre-wrap">{p.reply.text}</span>
             </div>
           )}
         </div>
 
         {lecturer || p.mine ? (
-          <span className="shrink-0 rounded-lg px-2 py-1 text-center text-sm tabular-nums text-slate-500" title="הצבעות">
+          <span className="shrink-0 rounded-xl px-2 py-1 text-center text-sm tabular-nums text-ink-3" title="הצבעות">
             👍 {p.votes}
           </span>
         ) : (
@@ -197,8 +198,8 @@ function PostCard({ p, lecturer, onChange, onRemove }: { p: FeedPost; lecturer: 
             disabled={busy}
             aria-pressed={p.votedByMe}
             onClick={() => run(`/posts/${p.id}/vote`, { method: 'POST', json: { up: !p.votedByMe } })}
-            className={`shrink-0 rounded-lg px-2.5 py-1 text-sm tabular-nums ring-1 transition disabled:opacity-60 ${
-              p.votedByMe ? 'bg-indigo-600 text-white ring-indigo-600' : 'bg-white text-slate-700 ring-slate-300 hover:bg-slate-50'
+            className={`shrink-0 rounded-xl px-2.5 py-1 text-sm tabular-nums ring-1 transition disabled:opacity-60 ${
+              p.votedByMe ? 'bg-accent text-white ring-accent' : 'bg-surface-2 text-ink-2 ring-line-strong hover:bg-surface'
             }`}
           >
             👍 {p.votes}
@@ -214,18 +215,18 @@ function PostCard({ p, lecturer, onChange, onRemove }: { p: FeedPost; lecturer: 
             rows={3}
             autoFocus
             placeholder="תגובה קצרה (הסטודנט/ית יקבל/תקבל התראה)"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+            className="w-full rounded-xl border border-line-strong px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
           />
           <div className="flex gap-2">
             <button
               type="button"
               disabled={busy}
               onClick={async () => (await patch({ reply })) && setReplying(false)}
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              className="btn-primary rounded-full px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
             >
               שמירה
             </button>
-            <button type="button" onClick={() => setReplying(false)} className="rounded-lg px-3 py-1.5 text-sm text-slate-600">
+            <button type="button" onClick={() => setReplying(false)} className="rounded-xl px-3 py-1.5 text-sm text-ink-2">
               ביטול
             </button>
           </div>
@@ -233,24 +234,24 @@ function PostCard({ p, lecturer, onChange, onRemove }: { p: FeedPost; lecturer: 
       )}
 
       {(lecturer || p.mine) && !replying && (
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-2 text-sm">
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-2 text-sm">
           {lecturer && (
             <>
-              <button type="button" disabled={busy} onClick={() => patch({ status: p.status === 'answered' ? 'open' : 'answered' })} className="text-emerald-700 hover:underline">
+              <button type="button" disabled={busy} onClick={() => patch({ status: p.status === 'answered' ? 'open' : 'answered' })} className="text-good hover:underline">
                 {p.status === 'answered' ? 'סמן כפתוח' : '✓ סמן כנענה'}
               </button>
-              <button type="button" disabled={busy} onClick={() => setReplying(true)} className="text-indigo-700 hover:underline">
+              <button type="button" disabled={busy} onClick={() => setReplying(true)} className="text-accent-ink hover:underline">
                 {p.reply ? 'עריכת תגובה' : 'תגובה'}
               </button>
-              <button type="button" disabled={busy} onClick={() => patch({ pinned: !p.pinned })} className="text-slate-600 hover:underline">
-                {p.pinned ? 'ביטול נעיצה' : '📌 נעיצה'}
+              <button type="button" disabled={busy} onClick={() => patch({ pinned: !p.pinned })} className="text-ink-2 hover:underline">
+                {p.pinned ? 'ביטול נעיצה' : 'נעיצה'}
               </button>
-              <button type="button" disabled={busy} onClick={() => patch({ hidden: !p.hidden })} className="text-slate-600 hover:underline">
+              <button type="button" disabled={busy} onClick={() => patch({ hidden: !p.hidden })} className="text-ink-2 hover:underline">
                 {p.hidden ? 'הצג לסטודנטים' : 'הסתר'}
               </button>
             </>
           )}
-          <button type="button" disabled={busy} onClick={remove} className="text-red-700 hover:underline">
+          <button type="button" disabled={busy} onClick={remove} className="text-bad hover:underline">
             מחיקה
           </button>
         </div>
@@ -320,28 +321,24 @@ export default function CourseFeed() {
     <div className="mx-auto max-w-2xl space-y-4">
       {lecturer ? (
         <div>
-          <Link to={`/courses/${id}`} className="text-sm text-slate-500 hover:underline">
-            → {feed?.course.name ?? 'חזרה לקורס'}
-          </Link>
+          <BackLink to={`/courses/${id}`}>{feed?.course.name ?? 'חזרה לקורס'}</BackLink>
           <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-xl font-bold">שאלות והערות</h1>
-            <Link to={`/courses/${id}/feed/present`} className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50">
+            <h1 className="text-xl">שאלות והערות</h1>
+            <Link to={`/courses/${id}/feed/present`} className="rounded-full bg-surface-2 px-4 py-2 text-sm font-medium text-ink ring-1 ring-line hover:bg-surface-3">
               מסך הקרנה
             </Link>
           </div>
-          <p className="text-sm text-slate-500">{openCount} שאלות פתוחות</p>
+          <p className="text-sm text-ink-3">{openCount} שאלות פתוחות</p>
         </div>
       ) : (
         <div className="space-y-3">
-          <Link to="/courses" className="text-sm text-slate-500 hover:underline">
-            → הקורסים שלי
-          </Link>
-          {feed && <h1 className="text-xl font-bold">{feed.course.name}</h1>}
+          <BackLink to="/courses">הקורסים שלי</BackLink>
+          {feed && <h1 className="text-xl">{feed.course.name}</h1>}
           <StudentCourseTabs courseId={id} active="feed" />
         </div>
       )}
 
-      {offline && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">אין חיבור לאינטרנט — אפשר לכתוב, וההודעות יישלחו כשהחיבור יחזור.</p>}
+      {offline && <p className="rounded-xl bg-warn-soft p-3 text-sm text-warn">אין חיבור לאינטרנט — אפשר לכתוב, וההודעות יישלחו כשהחיבור יחזור.</p>}
 
       {!lecturer && userId && <Composer courseId={id} userId={userId} onQueued={refreshOutbox} onSent={replace} />}
 
@@ -370,7 +367,7 @@ export default function CourseFeed() {
       </div>
 
       <ErrorBox>{error}</ErrorBox>
-      {!feed && !error && <p className="text-center text-slate-500">טוען…</p>}
+      {!feed && !error && <p className="text-center text-ink-3">טוען…</p>}
 
       <ul className="space-y-3">
         {outbox.map((q) => (
@@ -389,7 +386,7 @@ export default function CourseFeed() {
       </ul>
 
       {feed && posts.length === 0 && outbox.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
+        <div className="rounded-2xl border border-dashed border-line-strong bg-surface-2 p-8 text-center text-ink-2">
           {lecturer ? (filter === 'open' ? 'אין שאלות פתוחות.' : 'אין הודעות כאן.') : 'עוד אין שאלות או הצעות. היו הראשונים!'}
         </div>
       )}

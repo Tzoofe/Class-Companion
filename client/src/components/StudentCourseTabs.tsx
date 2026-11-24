@@ -9,14 +9,14 @@ export default function StudentCourseTabs({ courseId, active }: { courseId: stri
     <Link
       to={to}
       aria-current={active === key ? 'page' : undefined}
-      className={`flex-1 rounded-md px-3 py-2 text-center text-sm ${active === key ? 'bg-white font-medium shadow-sm' : 'text-slate-600'}`}
+      className={`flex-1 rounded-md px-3 py-2 text-center text-sm ${active === key ? 'bg-surface-2 font-medium ' : 'text-ink-2'}`}
     >
       {label}
     </Link>
   );
   return (
     <div className="space-y-3">
-      <nav className="flex rounded-lg bg-slate-100 p-1">
+      <nav className="flex rounded-xl bg-surface-2 p-1">
         {tab('checkin', `/courses/${courseId}/checkin`, 'נוכחות')}
         {tab('feed', `/courses/${courseId}/feed`, 'שאלות והערות')}
         {tab('polls', `/courses/${courseId}/polls`, 'סקרים')}

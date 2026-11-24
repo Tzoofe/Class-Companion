@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, fileBody, type CourseSettings as Settings } from '../api';
-import { ErrorBox, Field } from '../components/ui';
+import { ErrorBox, Field, BackLink, Toggle } from '../components/ui';
 
-const card = 'space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200';
-const smallButton = 'rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50';
+const card = 'space-y-3 card p-4';
+const smallButton = 'btn-primary rounded-full px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50';
 
 function DetailsForm({ course, onSaved }: { course: Settings; onSaved: (c: Settings) => void }) {
   const [name, setName] = useState(course.name);
   const [radius, setRadius] = useState(String(course.defaultRadiusM));
+  const [required, setRequired] = useState(course.attendanceRequired);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -19,7 +20,7 @@ function DetailsForm({ course, onSaved }: { course: Settings; onSaved: (c: Setti
     setError('');
     setSaved(false);
     try {
-      onSaved((await api<{ course: Settings }>(`/courses/${course.id}`, { method: 'PATCH', json: { name, defaultRadiusM: Number(radius) } })).course);
+      onSaved((await api<{ course: Settings }>(`/courses/${course.id}`, { method: 'PATCH', json: { name, defaultRadiusM: Number(radius), attendanceRequired: required } })).course);
       setSaved(true);
     } catch (err) {
       setError((err as Error).message);
@@ -30,16 +31,25 @@ function DetailsForm({ course, onSaved }: { course: Settings; onSaved: (c: Setti
 
   return (
     <form onSubmit={submit} className={card}>
-      <h2 className="font-semibold">פרטי הקורס</h2>
+      <h2 className="">פרטי הקורס</h2>
       <Field label="שם הקורס" value={name} onChange={(e) => setName(e.target.value)} required />
       <Field label="רדיוס נוכחות (מטרים)" type="number" min={5} max={500} value={radius} onChange={(e) => setRadius(e.target.value)} required />
-      <p className="text-xs text-slate-500">הרדיוס חל על מפגשי נוכחות חדשים.</p>
+      <p className="text-xs text-ink-3">הרדיוס חל על מפגשי נוכחות חדשים.</p>
+      <Toggle
+        checked={required}
+        onChange={(v) => {
+          setRequired(v);
+          setSaved(false);
+        }}
+        label="נוכחות חובה"
+        hint={required ? 'סטודנטים מתחת ל-70% נוכחות מופיעים ב"דורש תשומת לב".' : 'הנוכחות נרשמת כרגיל, אבל אף סטודנט/ית לא מסומן/ת בנוכחות נמוכה.'}
+      />
       <ErrorBox>{error}</ErrorBox>
       <div className="flex items-center gap-3">
         <button type="submit" disabled={busy} className={smallButton}>
           {busy ? '…' : 'שמירה'}
         </button>
-        {saved && <span className="text-sm text-emerald-700">✓ נשמר</span>}
+        {saved && <span className="text-sm text-good">✓ נשמר</span>}
       </div>
     </form>
   );
@@ -71,9 +81,9 @@ function AddStudent({ courseId, onSaved }: { courseId: string; onSaved: (c: Sett
   return (
     <form onSubmit={submit} className="space-y-2">
       <div className="grid gap-2 sm:grid-cols-3">
-        <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="שם פרטי" className="rounded-lg border border-slate-300 px-3 py-2" />
-        <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="שם משפחה" className="rounded-lg border border-slate-300 px-3 py-2" />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="אימייל" type="email" required dir="ltr" className="rounded-lg border border-slate-300 px-3 py-2" />
+        <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="שם פרטי" className="rounded-xl border border-line-strong px-3 py-2" />
+        <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="שם משפחה" className="rounded-xl border border-line-strong px-3 py-2" />
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="אימייל" type="email" required dir="ltr" className="rounded-xl border border-line-strong px-3 py-2" />
       </div>
       <ErrorBox>{error}</ErrorBox>
       <button type="submit" disabled={busy || !email} className={smallButton}>
@@ -126,7 +136,7 @@ function Reupload({ courseId, onSaved }: { courseId: string; onSaved: (c: Settin
         </label>
       </fieldset>
       <ErrorBox>{error}</ErrorBox>
-      {result && <p className="text-sm text-emerald-700">✓ {result}</p>}
+      {result && <p className="text-sm text-good">✓ {result}</p>}
       <button type="submit" disabled={busy || !file} className={smallButton}>
         {busy ? '…' : 'העלאה'}
       </button>
@@ -165,29 +175,27 @@ export default function CourseSettings() {
     }
   }
 
-  if (!course) return error ? <ErrorBox>{error}</ErrorBox> : <p className="text-slate-500">טוען…</p>;
+  if (!course) return error ? <ErrorBox>{error}</ErrorBox> : <p className="text-ink-3">טוען…</p>;
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
-        <Link to={`/courses/${id}`} className="text-sm text-slate-500 hover:underline">
-          → {course.name}
-        </Link>
-        <h1 className="mt-1 text-xl font-bold">הגדרות הקורס</h1>
+        <BackLink to={`/courses/${id}`}>{course.name}</BackLink>
+        <h1 className="mt-1 text-xl">הגדרות הקורס</h1>
       </div>
 
       <DetailsForm course={course} onSaved={setCourse} />
 
       <section className={card}>
         <div className="flex items-baseline justify-between">
-          <h2 className="font-semibold">רשימת הסטודנטים</h2>
-          <span className="text-sm text-slate-500">
+          <h2 className="">רשימת הסטודנטים</h2>
+          <span className="text-sm text-ink-3">
             {course.roster.length} · {course.roster.filter((s) => s.registered).length} נרשמו לאפליקציה
           </span>
         </div>
         <AddStudent courseId={id} onSaved={setCourse} />
-        <details className="rounded-lg bg-slate-50 p-3">
-          <summary className="cursor-pointer text-sm font-medium text-slate-700">העלאת קובץ רשימה מעודכן (.csv / .xlsx)</summary>
+        <details className="rounded-xl bg-surface p-3">
+          <summary className="cursor-pointer text-sm font-medium text-ink-2">העלאת קובץ רשימה מעודכן (.csv / .xlsx)</summary>
           <div className="mt-3">
             <Reupload courseId={id} onSaved={setCourse} />
           </div>
@@ -197,22 +205,22 @@ export default function CourseSettings() {
           placeholder="חיפוש"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+          className="w-full rounded-xl border border-line-strong bg-surface-2 px-3 py-2 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
         />
         <ErrorBox>{error}</ErrorBox>
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-line">
           {roster.map((s) => (
             <li key={s.email} className="flex items-center justify-between gap-3 py-2">
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">
                   {s.firstName} {s.lastName}
-                  {!s.registered && <span className="ms-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-normal text-amber-800">לא נרשם/ה</span>}
+                  {!s.registered && <span className="ms-2 rounded bg-warn-soft px-1.5 py-0.5 text-xs font-normal text-warn">לא נרשם/ה</span>}
                 </div>
-                <div className="truncate text-xs text-slate-500" dir="ltr">
+                <div className="truncate text-xs text-ink-3" dir="ltr">
                   {s.email}
                 </div>
               </div>
-              <button type="button" disabled={removing === s.email} onClick={() => remove(s.email, `${s.firstName} ${s.lastName}`.trim())} className="shrink-0 text-sm text-red-700 hover:underline disabled:opacity-50">
+              <button type="button" disabled={removing === s.email} onClick={() => remove(s.email, `${s.firstName} ${s.lastName}`.trim())} className="shrink-0 text-sm text-bad hover:underline disabled:opacity-50">
                 הסרה
               </button>
             </li>

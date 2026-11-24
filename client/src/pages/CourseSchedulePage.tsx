@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, WEEKDAYS_HE, type CourseEvent, type CourseSchedule, type EventKind, type Slot } from '../api';
-import { ErrorBox } from '../components/ui';
+import { ErrorBox, BackLink } from '../components/ui';
 
-const card = 'space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200';
-const input = 'rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200';
-const smallButton = 'rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50';
+const card = 'space-y-3 card p-4';
+const input = 'rounded-xl border border-line-strong bg-surface-2 px-3 py-2 outline-none focus:border-accent focus:ring-2 focus:ring-accent/30';
+const smallButton = 'btn-primary rounded-full px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50';
 
 const EVENT_KINDS: [Exclude<EventKind, 'cancelled'>, string][] = [
   ['extra', 'שיעור נוסף'],
@@ -55,11 +55,11 @@ function WeeklySlots({ data, onSaved }: { data: CourseSchedule; onSaved: (d: Par
 
   return (
     <form onSubmit={save} className={card}>
-      <h2 className="font-semibold">שיעורים קבועים בכל שבוע</h2>
-      {slots.length === 0 && <p className="text-sm text-slate-500">עוד לא הוגדרו שיעורים. הוסיפו את הזמנים הקבועים של הקורס.</p>}
+      <h2 className="">שיעורים קבועים בכל שבוע</h2>
+      {slots.length === 0 && <p className="text-sm text-ink-3">עוד לא הוגדרו שיעורים. הוסיפו את הזמנים הקבועים של הקורס.</p>}
       <ul className="space-y-3">
         {slots.map((s, i) => (
-          <li key={s.id ?? `new-${i}`} className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[8rem_6rem_6rem_1fr_1fr_auto] sm:items-center">
+          <li key={s.id ?? `new-${i}`} className="grid grid-cols-2 gap-2 rounded-xl bg-surface p-3 sm:grid-cols-[8rem_6rem_6rem_1fr_1fr_auto] sm:items-center">
             <select value={s.weekday} onChange={(e) => set(i, { weekday: Number(e.target.value) })} className={input} aria-label="יום">
               {WEEKDAYS_HE.map((d, n) => (
                 <option key={n} value={n}>
@@ -73,7 +73,7 @@ function WeeklySlots({ data, onSaved }: { data: CourseSchedule; onSaved: (d: Par
             </div>
             <input value={s.title} onChange={(e) => set(i, { title: e.target.value })} placeholder="סוג (הרצאה / תרגול)" className={input} />
             <input value={s.place} onChange={(e) => set(i, { place: e.target.value })} placeholder="מקום (חדר 204)" className={input} />
-            <button type="button" onClick={() => setSlots((xs) => xs.filter((_, j) => j !== i))} className="justify-self-start text-sm text-red-700 hover:underline">
+            <button type="button" onClick={() => setSlots((xs) => xs.filter((_, j) => j !== i))} className="justify-self-start text-sm text-bad hover:underline">
               הסרה
             </button>
           </li>
@@ -82,27 +82,27 @@ function WeeklySlots({ data, onSaved }: { data: CourseSchedule; onSaved: (d: Par
       <button
         type="button"
         onClick={() => setSlots((xs) => [...xs, { weekday: 0, start: '10:00', end: '12:00', title: '', place: '' }])}
-        className="text-sm font-medium text-indigo-700 hover:underline"
+        className="text-sm font-medium text-accent-ink hover:underline"
       >
         + שיעור שבועי
       </button>
-      <div className="grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-2">
+      <div className="grid gap-2 border-t border-line pt-3 sm:grid-cols-2">
         <label className="text-sm">
-          <span className="mb-1 block text-slate-600">תחילת הסמסטר (לא חובה)</span>
+          <span className="mb-1 block text-ink-2">תחילת הסמסטר (לא חובה)</span>
           <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={`${input} w-full`} />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-slate-600">סוף הסמסטר (לא חובה)</span>
+          <span className="mb-1 block text-ink-2">סוף הסמסטר (לא חובה)</span>
           <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className={`${input} w-full`} />
         </label>
       </div>
-      <p className="text-xs text-slate-500">סטודנטים יקבלו התראה כששעות השיעורים משתנות.</p>
+      <p className="text-xs text-ink-3">סטודנטים יקבלו התראה כששעות השיעורים משתנות.</p>
       <ErrorBox>{error}</ErrorBox>
       <div className="flex items-center gap-3">
         <button type="submit" disabled={busy} className={smallButton}>
           {busy ? '…' : 'שמירה'}
         </button>
-        {saved && <span className="text-sm text-emerald-700">✓ נשמר</span>}
+        {saved && <span className="text-sm text-good">✓ נשמר</span>}
       </div>
     </form>
   );
@@ -132,10 +132,10 @@ function EventEditor({ courseId, initial, eventId, onSaved, onCancel }: { course
   }
 
   return (
-    <form onSubmit={submit} className="space-y-2 rounded-lg bg-slate-50 p-3">
-      <div className="flex flex-wrap gap-1 rounded-lg bg-white p-0.5 text-sm ring-1 ring-slate-200">
+    <form onSubmit={submit} className="space-y-2 rounded-xl bg-surface p-3">
+      <div className="flex flex-wrap gap-1 rounded-xl bg-surface-2 p-0.5 text-sm ring-1 ring-line">
         {EVENT_KINDS.map(([k, label]) => (
-          <button key={k} type="button" onClick={() => set({ kind: k })} className={`flex-1 rounded-md px-2 py-1 ${f.kind === k ? 'bg-indigo-600 text-white' : 'text-slate-600'}`}>
+          <button key={k} type="button" onClick={() => set({ kind: k })} className={`flex-1 rounded-md px-2 py-1 ${f.kind === k ? 'bg-accent text-white' : 'text-ink-2'}`}>
             {label}
           </button>
         ))}
@@ -156,11 +156,11 @@ function EventEditor({ courseId, initial, eventId, onSaved, onCancel }: { course
         <button type="submit" disabled={busy} className={smallButton}>
           {busy ? '…' : eventId ? 'שמירה' : 'הוספה'}
         </button>
-        <button type="button" onClick={onCancel} className="px-3 text-sm text-slate-600">
+        <button type="button" onClick={onCancel} className="px-3 text-sm text-ink-2">
           ביטול
         </button>
       </div>
-      <p className="text-xs text-slate-500">הסטודנטים בקורס יקבלו התראה.</p>
+      <p className="text-xs text-ink-3">הסטודנטים בקורס יקבלו התראה.</p>
     </form>
   );
 }
@@ -241,18 +241,18 @@ function Events({ data, onChange }: { data: CourseSchedule; onChange: (events: C
           <div className="font-medium">
             {fmtDate(ev.date)} · <span dir="ltr">{ev.start}{ev.end && `–${ev.end}`}</span>
           </div>
-          <div className={ev.kind === 'cancelled' ? 'text-red-700' : 'text-slate-600'}>
+          <div className={ev.kind === 'cancelled' ? 'text-bad' : 'text-ink-2'}>
             {ev.kind === 'cancelled' ? `✕ ${KIND_LABEL.cancelled}` : `${KIND_LABEL[ev.kind]}${ev.title ? ` · ${ev.title}` : ''}`}
-            {ev.place && ` · 📍 ${ev.place}`}
+            {ev.place && `, ${ev.place}`}
           </div>
         </div>
         <span className="flex shrink-0 gap-3 text-sm">
           {ev.kind !== 'cancelled' && (
-            <button type="button" onClick={() => setEditing(ev.id)} className="text-indigo-700 hover:underline">
+            <button type="button" onClick={() => setEditing(ev.id)} className="text-accent-ink hover:underline">
               עריכה
             </button>
           )}
-          <button type="button" onClick={() => remove(ev)} className="text-red-700 hover:underline">
+          <button type="button" onClick={() => remove(ev)} className="text-bad hover:underline">
             {ev.kind === 'cancelled' ? 'ביטול הביטול' : 'מחיקה'}
           </button>
         </span>
@@ -261,11 +261,11 @@ function Events({ data, onChange }: { data: CourseSchedule; onChange: (events: C
 
   return (
     <section className={card}>
-      <h2 className="font-semibold">אירועים חד-פעמיים</h2>
+      <h2 className="">אירועים חד-פעמיים</h2>
 
       {classes.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-red-50 p-3 text-sm">
-          <span className="font-medium text-red-900">ביטול שיעור:</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-bad-soft p-3 text-sm">
+          <span className="font-medium text-bad">ביטול שיעור:</span>
           <select value={cancelKey} onChange={(e) => setCancelKey(e.target.value)} className={`${input} min-w-0 flex-1`}>
             <option value="">בחרו שיעור…</option>
             {classes.map((c) => (
@@ -275,7 +275,7 @@ function Events({ data, onChange }: { data: CourseSchedule; onChange: (events: C
               </option>
             ))}
           </select>
-          <button type="button" disabled={!cancelKey || busy} onClick={cancelClass} className="rounded-lg bg-red-600 px-3 py-2 font-medium text-white disabled:opacity-50">
+          <button type="button" disabled={!cancelKey || busy} onClick={cancelClass} className="rounded-xl bg-bad px-3 py-2 font-medium text-white disabled:opacity-50">
             ביטול השיעור
           </button>
         </div>
@@ -284,17 +284,17 @@ function Events({ data, onChange }: { data: CourseSchedule; onChange: (events: C
       {adding ? (
         <EventEditor courseId={data.course.id} initial={blankEvent(data.today)} onSaved={saved} onCancel={() => setAdding(false)} />
       ) : (
-        <button type="button" onClick={() => setAdding(true)} className="text-sm font-medium text-indigo-700 hover:underline">
+        <button type="button" onClick={() => setAdding(true)} className="text-sm font-medium text-accent-ink hover:underline">
           + שיעור נוסף / שעות קבלה / פגישה / מבחן
         </button>
       )}
       <ErrorBox>{error}</ErrorBox>
 
-      {upcoming.length > 0 ? <ul className="divide-y divide-slate-100">{upcoming.map(row)}</ul> : !adding && <p className="text-sm text-slate-500">אין אירועים קרובים.</p>}
+      {upcoming.length > 0 ? <ul className="divide-y divide-line">{upcoming.map(row)}</ul> : !adding && <p className="text-sm text-ink-3">אין אירועים קרובים.</p>}
       {past.length > 0 && (
         <details>
-          <summary className="cursor-pointer text-sm text-slate-500">אירועים שעברו ({past.length})</summary>
-          <ul className="divide-y divide-slate-100 opacity-70">{past.map(row)}</ul>
+          <summary className="cursor-pointer text-sm text-ink-3">אירועים שעברו ({past.length})</summary>
+          <ul className="divide-y divide-line opacity-70">{past.map(row)}</ul>
         </details>
       )}
     </section>
@@ -311,16 +311,14 @@ export default function CourseSchedulePage() {
     api<CourseSchedule>(`/courses/${id}/schedule`).then(setData, (e) => setError(e.message));
   }, [id]);
 
-  if (!data) return error ? <ErrorBox>{error}</ErrorBox> : <p className="text-slate-500">טוען…</p>;
+  if (!data) return error ? <ErrorBox>{error}</ErrorBox> : <p className="text-ink-3">טוען…</p>;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <div>
-        <Link to={`/courses/${id}`} className="text-sm text-slate-500 hover:underline">
-          → {data.course.name}
-        </Link>
-        <h1 className="mt-1 text-xl font-bold">לוח זמנים</h1>
-        <p className="text-sm text-slate-500">השיעורים והאירועים מופיעים ב"היום" שלך ושל הסטודנטים בקורס.</p>
+        <BackLink to={`/courses/${id}`}>{data.course.name}</BackLink>
+        <h1 className="mt-1 text-xl">לוח זמנים</h1>
+        <p className="text-sm text-ink-3">השיעורים והאירועים מופיעים ב"היום" שלך ושל הסטודנטים בקורס.</p>
       </div>
       <WeeklySlots data={data} onSaved={(r) => setData((d) => d && { ...d, ...r })} />
       <Events data={data} onChange={(events) => setData((d) => d && { ...d, events })} />

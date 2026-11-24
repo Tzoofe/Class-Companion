@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BackLink } from '../components/ui';
 import { Link, useParams } from 'react-router-dom';
 import type { SessionStatus } from '../api';
 import SessionRoster from '../components/SessionRoster';
@@ -15,21 +16,19 @@ export default function SessionDetail() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
-        <Link to={`/courses/${id}/sessions`} className="text-sm text-slate-500 hover:underline">
-          → כל המפגשים
-        </Link>
+        <BackLink to={`/courses/${id}/sessions`}>כל המפגשים</BackLink>
         {summary && (
           <>
-            <h1 className="mt-1 text-xl font-bold">{when(summary.session.startsAt)}</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="mt-1 text-xl">{when(summary.session.startsAt)}</h1>
+            <p className="text-sm text-ink-3">
               {summary.session.courseName} · {summary.checkedInCount}/{summary.rosterCount} נוכחים
             </p>
           </>
         )}
       </div>
       {live && (
-        <Link to={`/courses/${id}/attendance`} className="block rounded-xl bg-emerald-50 p-3 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100">
-          ● המפגש עדיין פעיל — למסך הנוכחות החי ←
+        <Link to={`/courses/${id}/attendance`} className="block rounded-2xl bg-good-soft p-3 text-sm font-medium text-good ring-1 ring-good/30 hover:bg-good-soft">
+          המפגש עדיין פעיל. למסך הנוכחות החי
         </Link>
       )}
       <SessionRoster sessionId={sessionId} live={live} onSummary={setSummary} />
