@@ -13,6 +13,8 @@ export type Met = 'yes' | 'partial' | 'no' | 'unknown';
 
 export interface ReviewResult {
   summary: string;
+  /** One sentence on how the student approached the task (no quotes), for class comparisons. */
+  approach: string;
   strengths: string[];
   improvements: string[];
   criteria: { criterionId: string; met: Met; feedback: string; suggestion: string; points: number }[];
@@ -55,6 +57,7 @@ ${text}
 
 כתוב:
 - summary: הערכה כללית ב-2 עד 3 משפטים.
+- approach: משפט אחד שמתאר את הגישה של הפתרון (למשל "רקורסיה עם מקרה בסיס n == 0" או "לולאה עם משתנה צובר"), בלי לצטט מההגשה.
 - strengths: עד 3 דברים שנעשו היטב.
 - improvements: עד 4 שיפורים קונקרטיים, החשוב ביותר קודם.
 - criteria: לכל קריטריון (לפי המזהה בסוגריים): met (yes = עומד בדרישה במלואה, partial = חלקית, no = חסר), feedback (מה ראית בהגשה), suggestion (מה לשפר).`;
@@ -67,6 +70,7 @@ export function reviewSchema(criteria: Criterion[]) {
     type: 'object',
     properties: {
       summary: str,
+      approach: str,
       strengths: { type: 'array', items: str },
       improvements: { type: 'array', items: str },
       criteria: {
@@ -78,7 +82,7 @@ export function reviewSchema(criteria: Criterion[]) {
         },
       },
     },
-    required: ['summary', 'strengths', 'improvements', 'criteria'],
+    required: ['summary', 'approach', 'strengths', 'improvements', 'criteria'],
   };
 }
 
@@ -103,6 +107,7 @@ export function normalizeReview(raw: unknown, criteria: Criterion[]): ReviewResu
   const crits = criteria.length ? criteria : [{ id: 'general', title: '', description: '', points: 0 }];
   return {
     summary: typeof r.summary === 'string' ? plain(r.summary) : '',
+    approach: typeof r.approach === 'string' ? plain(r.approach).slice(0, 200) : '',
     strengths: list(r.strengths, 3),
     improvements: list(r.improvements, 4),
     criteria: crits.map((c) => {
@@ -159,4 +164,145 @@ ${good || '(אין)'}
     schema: OVERVIEW_SCHEMA,
   })) as Record<string, unknown>;
   return { summary: typeof raw.summary === 'string' ? raw.summary.trim() : '', commonIssues: list(raw.commonIssues, 5), strengths: list(raw.strengths, 3) };
+}
+
+// ── Comparison with the class (after the deadline) ──
+
+export interface ClassPatterns {
+  approaches: { description: string; count: number }[];
+  commonStrengths: string[];
+  commonGaps: string[];
+}
+
+const PATTERNS_SCHEMA = {
+  type: 'object',
+  properties: {
+    approaches: { type: 'array', items: { type: 'object', properties: { description: { type: 'string' }, count: { type: 'number' } }, required: ['description', 'count'] } },
+    commonStrengths: { type: 'array', items: { type: 'string' } },
+    commonGaps: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['approaches', 'commonStrengths', 'commonGaps'],
+};
+
+/**
+ * Groups the class into a few anonymous patterns. Input is the reviews only (approach sentences,
+ * strengths, improvements), never submission text, so nothing a classmate wrote can leak.
+ */
+export async function classPatterns(
+  assignment: { title: string },
+  reviews: { approach: string; summary: string; strengths: string[]; improvements: string[] }[],
+  llm: LlmClient,
+): Promise<ClassPatterns> {
+  const lines = reviews.map((r, i) => `${i + 1}. גישה: ${r.approach || r.summary.slice(0, 160)} | חוזקות: ${r.strengths.join('; ')} | לשיפור: ${r.improvements.join('; ')}`).join('\n');
+  const raw = (await llm({
+    system: SYSTEM,
+    user: `מטלה: ${assignment.title}
+לפניך תקצירים אנונימיים של ${reviews.length} הגשות (גישה, חוזקות, שיפורים):
+${lines}
+
+כתוב:
+- approaches: עד 5 גישות שונות לפתרון שהופיעו בכיתה, עם count = בערך כמה הגשות נקטו בכל גישה. אחד גישות דומות.
+- commonStrengths: עד 3 דברים שרוב הכיתה עשתה היטב.
+- commonGaps: עד 4 דברים שחסרו אצל חלק ניכר מהכיתה.
+אל תזכיר מספרי הגשות ואל תצטט.`,
+    schema: PATTERNS_SCHEMA,
+  })) as Record<string, unknown>;
+  const approaches = Array.isArray(raw.approaches)
+    ? (raw.approaches as { description?: unknown; count?: unknown }[])
+        .filter((a) => typeof a?.description === 'string' && a.description.trim())
+        .map((a) => ({ description: plain(String(a.description)), count: Math.max(1, Math.min(reviews.length, Math.round(Number(a.count) || 1))) }))
+        .slice(0, 5)
+    : [];
+  return { approaches, commonStrengths: list(raw.commonStrengths, 3), commonGaps: list(raw.commonGaps, 4) };
+}
+
+export interface Comparison {
+  summary: string;
+  likeMost: string[];
+  othersDid: string[];
+  standOut: string[];
+}
+
+const COMPARISON_SCHEMA = {
+  type: 'object',
+  properties: { summary: { type: 'string' } },
+  required: ['summary'],
+};
+
+/** A criterion counts as "most of the class" at 50% and up. */
+const MAJORITY = 50;
+
+/**
+ * The student's work vs. the class. The three lists come only from the per-criterion numbers (facts);
+ * the model writes just the summary paragraph (small models invent comparisons when asked for lists).
+ */
+export async function compareToClass(
+  assignment: { title: string; criteria: Criterion[] },
+  mine: { approach: string; summary: string; strengths: string[]; improvements: string[]; criteria: { criterionId: string; met: Met }[] },
+  patterns: ClassPatterns,
+  shares: Record<string, number>,
+  classSize: number,
+  llm: LlmClient,
+): Promise<Comparison> {
+  const likeMost: string[] = [];
+  const othersDid: string[] = [];
+  const standOut: string[] = [];
+  for (const c of assignment.criteria) {
+    const met = mine.criteria.find((x) => x.criterionId === c.id)?.met ?? 'unknown';
+    const share = shares[c.id];
+    if (share === undefined || met === 'unknown') continue;
+    if (met === 'yes' && share >= MAJORITY) likeMost.push(`${c.title}: עמדת בדרישה, כמו ${share}% מהכיתה`);
+    else if (met === 'yes') standOut.push(`${c.title}: עמדת בדרישה, ורק ${share}% מהכיתה עמדו בה`);
+    else if (share >= MAJORITY) othersDid.push(`${c.title}: ${share}% מהכיתה עמדו בדרישה, ואצלך ${met === 'partial' ? 'זה חלקי' : 'זה חסר'}`);
+  }
+
+  const facts = [
+    likeMost.length ? `כמו רוב הכיתה: ${likeMost.join('; ')}` : '',
+    othersDid.length ? `רוב הכיתה עשתה ואצלך חסר: ${othersDid.join('; ')}` : '',
+    standOut.length ? `בולט לטובה: ${standOut.join('; ')}` : '',
+  ].filter(Boolean).join('\n');
+  const raw = (await llm({
+    system: SYSTEM,
+    user: `מטלה: ${assignment.title}
+השוואה של הגשה אחת לכיתה (${classSize} הגשות אחרות). כתוב לסטודנט, בגוף שני.
+
+הגישה בהגשה שלך: ${mine.approach || mine.summary}
+הגישות בכיתה: ${patterns.approaches.map((a) => `${a.description} (${a.count})`).join('; ') || '(לא ידוע)'}
+מה שרוב הכיתה עשתה היטב: ${patterns.commonStrengths.join('; ') || '(אין)'}
+החוזקות שלך: ${mine.strengths.join('; ') || '(אין)'}
+
+עובדות לפי קריטריונים:
+${facts || '(אין הבדלים בולטים)'}
+
+כתוב:
+- summary: 2 עד 3 משפטים: איפה ההגשה עומדת ביחס לכיתה, כולל אם הגישה שלך נפוצה או ייחודית. התבסס רק על העובדות למעלה.
+אל תזכיר סטודנטים אחרים ואל תצטט הגשות.`,
+    schema: COMPARISON_SCHEMA,
+  })) as Record<string, unknown>;
+  return {
+    summary: typeof raw.summary === 'string' ? plain(raw.summary) : '',
+    likeMost,
+    othersDid,
+    standOut,
+  };
+}
+
+export interface GradeStats {
+  count: number;
+  mean: number;
+  median: number;
+  /** 10 equal-width bins from 0 to maxPoints. */
+  bins: number[];
+  binWidth: number;
+}
+
+/** Grade distribution (anonymous). */
+export function gradeStats(points: number[], maxPoints: number): GradeStats {
+  const sorted = [...points].sort((a, b) => a - b);
+  const n = sorted.length;
+  const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+  const binWidth = maxPoints / 10;
+  const bins = Array(10).fill(0) as number[];
+  for (const p of sorted) bins[Math.min(9, Math.floor(p / binWidth))]++;
+  return { count: n, mean: Math.round((sorted.reduce((a, b) => a + b, 0) / n) * 10) / 10, median: Math.round(median * 10) / 10, bins, binWidth };
 }

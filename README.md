@@ -150,6 +150,11 @@ One-time setup (macOS): `brew install ffmpeg whisper-cpp ollama && brew services
   partial / missing with feedback and a suggestion, strengths and improvements. Suggested points come from the
   verdict (full / half / zero), not from the model. Students also see how the class did on each criterion once
   at least 5 classmates were reviewed (anonymous aggregates only).
+- **Compare with the class** (students, after the deadline, 5+ reviewed classmates): the model groups the class
+  into anonymous approach patterns (from the reviews only, never submission text), and the student gets a summary
+  plus three factual lists from the per-criterion numbers: like most of the class, what most did that you didn't,
+  where you stand out. After grades are released (5+ graded), students see the grade distribution with their own
+  position.
 - **Lecturer:** grading prefilled with the suggestion, comment, original file download, release grades
   (students notified), class overview of common mistakes, and **similar submissions** (shared 5-word
   sequences, works across renamed files) with a side-by-side view. Grades are in the export (*ציונים* sheet).

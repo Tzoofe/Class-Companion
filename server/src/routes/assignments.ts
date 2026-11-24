@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 import { config } from '../config.js';
 import { findAccessibleCourse, findOwnCourse } from '../lib/access.js';
 import { ExtractError, SUBMISSION_LIMITS, extractSubmission, isCodeSubmission } from '../lib/assignments/extract.js';
-import { classOverview, modelFor, reviewSubmission, type Criterion } from '../lib/assignments/review.js';
+import { classOverview, classPatterns, compareToClass, gradeStats, modelFor, reviewSubmission, type Criterion } from '../lib/assignments/review.js';
 import { similarPairs } from '../lib/assignments/similarity.js';
 import { enqueueJob } from '../lib/jobs.js';
 import { notifyCourseStudents, notifyInBackground } from '../lib/push.js';
@@ -138,6 +138,9 @@ function submissionView(s: SubmissionDoc, opts: { lecturer: boolean; gradesRelea
     review: reviewView(s, opts.lecturer),
     suggestedPoints: opts.lecturer ? suggested : undefined,
     grade: showGrade && s.grade ? { points: s.grade.points, criteria: s.grade.criteria, comment: s.grade.comment, gradedAt: s.grade.gradedAt } : null,
+    comparison: s.comparison
+      ? { status: s.comparison.status, error: s.comparison.error ?? '', summary: s.comparison.summary ?? '', likeMost: s.comparison.likeMost ?? [], othersDid: s.comparison.othersDid ?? [], standOut: s.comparison.standOut ?? [], classSize: s.comparison.classSize ?? 0, generatedAt: s.comparison.generatedAt ?? null }
+      : null,
   };
 }
 
@@ -154,6 +157,13 @@ async function classShares(a: AssignmentDoc, excludeEmail: string) {
       return [c.id, Math.round((met / others.length) * 100)];
     }),
   );
+}
+
+/** Anonymous grade distribution; only once enough students are graded. */
+async function gradeStatsFor(a: AssignmentDoc, minCount = MIN_CLASS_FOR_COMPARISON) {
+  const graded = (await Submission.find({ assignmentId: a._id, kind: 'final', grade: { $exists: true } }, { 'grade.points': 1 })) as unknown as SubmissionDoc[];
+  const points = graded.map((g) => g.grade?.points).filter((p): p is number => typeof p === 'number');
+  return points.length >= minCount ? gradeStats(points, a.maxPoints) : null;
 }
 
 // ───────────── access ─────────────
@@ -313,6 +323,7 @@ assignmentsRouter.get('/assignments/:aid', requireAuth, async (req, res) => {
     res.json({
       course: { id: course.id, name: course.name },
       assignment: { ...assignmentBase(a), classOverview: a.classOverview ?? null },
+      gradeStats: await gradeStatsFor(a, 1),
       submissions: (finals as unknown as SubmissionDoc[]).map((s) => ({ ...submissionView(s, { lecturer: true, gradesReleased: true, names }), practiceUsed: practiceBy.get(s.email) ?? 0 })),
       missing: course.roster.filter((r) => !submitted.has(r.email.toLowerCase())).map((r) => ({ email: r.email, name: names.get(r.email.toLowerCase()) ?? r.email })),
     });
@@ -329,6 +340,8 @@ assignmentsRouter.get('/assignments/:aid', requireAuth, async (req, res) => {
     practice: practice.map((s) => submissionView(s, { lecturer: false, gradesReleased: false })),
     practiceLeft: Math.max(0, a.practiceLimit - practice.length),
     classShares: me ? await classShares(a, me.email) : null,
+    comparisonOpen: a.dueAt.getTime() <= Date.now(),
+    gradeStats: a.gradesReleased ? await gradeStatsFor(a) : null,
   });
 });
 
@@ -436,6 +449,73 @@ assignmentsRouter.post('/assignments/:aid/overview', requireAuth, requireRole('l
 // ───────────── routes: submissions ─────────────
 
 /**
+ * Student: compare my final submission with the class. Only after the deadline (so it can't hint at answers),
+ * only with enough reviewed classmates (anonymity). Runs in the background.
+ */
+assignmentsRouter.post('/submissions/:sid/compare', requireAuth, requireRole('student'), async (req, res) => {
+  const found = await findSubmission(String(req.params.sid), req.auth!);
+  if (!found || found.submission.kind !== 'final') {
+    res.status(404).json({ error: 'Submission not found' });
+    return;
+  }
+  const { submission: s, assignment: a } = found;
+  if (a.dueAt.getTime() > Date.now()) {
+    res.status(409).json({ error: 'Comparison opens after the deadline' });
+    return;
+  }
+  if (s.review?.status !== 'done') {
+    res.status(409).json({ error: 'Wait for your review first' });
+    return;
+  }
+  const others = await Submission.countDocuments({ assignmentId: a._id, kind: 'final', 'review.status': 'done', email: { $ne: s.email } });
+  if (others < MIN_CLASS_FOR_COMPARISON) {
+    res.status(409).json({ error: 'Not enough classmates reviewed yet', min: MIN_CLASS_FOR_COMPARISON });
+    return;
+  }
+  if (s.comparison?.status === 'queued' || s.comparison?.status === 'running') {
+    res.status(202).json({ submission: submissionView(s, { lecturer: false, gradesReleased: a.gradesReleased }) });
+    return;
+  }
+  s.set({ comparison: { status: 'queued', error: '' } });
+  await s.save();
+  const sid = s.id as string;
+  void enqueueJob('comparison', async () => {
+    const sub = await Submission.findById(sid);
+    const asg = sub && (await Assignment.findById(sub.assignmentId));
+    if (!sub || !asg) return;
+    sub.set({ 'comparison.status': 'running' });
+    await sub.save();
+    try {
+      const reviewed = (await Submission.find({ assignmentId: asg._id, kind: 'final', 'review.status': 'done' }, { email: 1, review: 1 })) as unknown as SubmissionDoc[];
+      const others = reviewed.filter((r) => r.email !== sub.email);
+      // Class patterns are shared by all students; rebuild only when more submissions were reviewed.
+      if (!asg.classPatterns || asg.classPatterns.basedOn !== reviewed.length) {
+        const p = await classPatterns(asg, reviewed.map((r) => ({ approach: r.review!.approach ?? '', summary: r.review!.summary, strengths: r.review!.strengths, improvements: r.review!.improvements })), llm);
+        asg.set({ classPatterns: { ...p, basedOn: reviewed.length, generatedAt: new Date() } });
+        await asg.save();
+      }
+      const cp = asg.classPatterns!;
+      const shares = (await classShares(asg, sub.email)) ?? {};
+      const r = sub.review!;
+      const c = await compareToClass(
+        { title: asg.title, criteria: criteriaOf(asg) },
+        { approach: r.approach ?? '', summary: r.summary, strengths: r.strengths, improvements: r.improvements, criteria: r.criteria.map((x) => ({ criterionId: x.criterionId ?? '', met: (x.met ?? 'unknown') as 'yes' })) },
+        { approaches: cp.approaches.map((x) => ({ description: x.description ?? '', count: x.count ?? 0 })), commonStrengths: cp.commonStrengths, commonGaps: cp.commonGaps },
+        shares,
+        others.length,
+        llm,
+      );
+      sub.set({ comparison: { status: 'done', error: '', ...c, classSize: others.length, generatedAt: new Date() } });
+      await sub.save();
+    } catch (e) {
+      sub.set({ 'comparison.status': 'failed', 'comparison.error': (e as Error).message.slice(0, 300) });
+      await sub.save();
+    }
+  });
+  res.status(202).json({ submission: submissionView(s, { lecturer: false, gradesReleased: a.gradesReleased }) });
+});
+
+/**
  * Student uploads a PDF or ZIP as the raw body. `?kind=final` (replaces their previous final; marked late
  * after the due date) or `?kind=practice` (private AI review, limited per assignment). `fileName` required.
  */
@@ -496,6 +576,7 @@ assignmentsRouter.post('/assignments/:aid/submissions', requireAuth, requireRole
     lateMs: kind === 'final' ? Math.max(0, now.getTime() - a.dueAt.getTime()) : 0,
     review: { status: 'queued', error: '', summary: '', strengths: [], improvements: [], criteria: [], model: '' },
     grade: undefined, // a resubmission needs grading again
+    comparison: undefined,
   });
   await mkdir(config.submissionsDir, { recursive: true });
   const stored = path.join(config.submissionsDir, `${s.id}${ext}`);

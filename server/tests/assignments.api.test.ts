@@ -30,6 +30,8 @@ const models: string[] = [];
 const fakeLlm: LlmClient = async ({ user, model }) => {
   models.push(model ?? 'default');
   if (user.includes('commonIssues')) return { summary: 'רוב הכיתה בסדר', commonIssues: ['חסר ניתוח סיבוכיות'], strengths: ['קוד קריא'] };
+  if (user.includes('commonGaps')) return { approaches: [{ description: 'רקורסיה עם מקרה בסיס', count: 4 }, { description: 'לולאה', count: 99 }], commonStrengths: ['קוד קריא'], commonGaps: ['ניתוח סיבוכיות'] };
+  if (user.includes('השוואה של הגשה אחת')) return { summary: 'את/ה ברמה של הכיתה' };
   const base = /base case|fact\(n - 1\)/i.test(user);
   return {
     summary: base ? 'פתרון טוב' : 'חסר מקרה בסיס',
@@ -202,5 +204,78 @@ describe('assignments', () => {
     expect((await api().get(`/api/submissions/${sid}/file`).set(lect)).status).toBe(200);
     expect((await api().get(`/api/submissions/${sid}/file`).set(students[0])).status).toBe(200);
     expect((await api().get(`/api/submissions/${sid}/file`).set(students[1])).status).toBe(404);
+  });
+});
+
+describe('comparison with the class and grade distribution', () => {
+  const prompts: string[] = [];
+  const spy: LlmClient = async (req) => {
+    prompts.push(req.user);
+    return fakeLlm(req);
+  };
+
+  async function classWithSubmissions(dueAt: string) {
+    const ctx = await setup(6);
+    setReviewLlm(spy);
+    const a = (await ctx.create({ dueAt, publish: true })).body.assignment;
+    const ids: string[] = [];
+    for (let i = 0; i < 6; i++) ids.push((await ctx.submit(ctx.students[i], a.id, 'final', 'hw.pdf', makePdf(`base case answer by student number ${i} SECRET${i}TOKEN`))).body.submission.id);
+    await settleJobs();
+    return { ...ctx, a, ids };
+  }
+
+  it('opens only after the deadline', async () => {
+    const { students, ids } = await classWithSubmissions(future());
+    const res = await api().post(`/api/submissions/${ids[0]}/compare`).set(students[0]);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('Comparison opens after the deadline');
+  });
+
+  it('compares using anonymous patterns only, never classmates\' text', async () => {
+    const { students, ids, a } = await classWithSubmissions(new Date(Date.now() - 60_000).toISOString());
+    prompts.length = 0;
+    expect((await api().post(`/api/submissions/${ids[0]}/compare`).set(students[0])).status).toBe(202);
+    await settleJobs();
+    const mine = (await api().get(`/api/assignments/${a.id}`).set(students[0])).body;
+    expect(mine.comparisonOpen).toBe(true);
+    // Facts from the numbers: everyone met "base" (100%) and nobody fully met "complexity" (0%).
+    expect(mine.final.comparison).toMatchObject({
+      status: 'done',
+      summary: 'את/ה ברמה של הכיתה',
+      likeMost: ['מקרה בסיס: עמדת בדרישה, כמו 100% מהכיתה'],
+      othersDid: [],
+      standOut: [],
+      classSize: 5,
+    });
+    // The patterns + comparison prompts never contain any submission's text.
+    expect(prompts).toHaveLength(2);
+    for (const p of prompts) expect(p).not.toMatch(/SECRET\dTOKEN/);
+    // Counts are capped to the class size; patterns are cached for the next student.
+    expect((await Assignment.findById(a.id))!.classPatterns!.approaches.map((x) => x.count)).toEqual([4, 6]);
+    prompts.length = 0;
+    await api().post(`/api/submissions/${ids[1]}/compare`).set(students[1]);
+    await settleJobs();
+    expect(prompts).toHaveLength(1);
+    // Only your own submission
+    expect((await api().post(`/api/submissions/${ids[2]}/compare`).set(students[0])).status).toBe(404);
+  });
+
+  it('needs enough reviewed classmates', async () => {
+    const { students, ids } = await classWithSubmissions(new Date(Date.now() - 60_000).toISOString());
+    await Submission.deleteMany({ _id: { $in: ids.slice(1, 3) } });
+    const res = await api().post(`/api/submissions/${ids[0]}/compare`).set(students[0]);
+    expect(res.body.error).toBe('Not enough classmates reviewed yet');
+  });
+
+  it('shows the grade distribution after release, with enough grades', async () => {
+    const { students, ids, a, lect } = await classWithSubmissions(future());
+    const grades = [40, 55, 70, 85, 100, 90];
+    for (const [i, id] of ids.entries()) await api().put(`/api/submissions/${id}/grade`).set(lect).send({ points: grades[i] });
+    expect((await api().get(`/api/assignments/${a.id}`).set(students[0])).body.gradeStats).toBeNull(); // not released
+    expect((await api().get(`/api/assignments/${a.id}`).set(lect)).body.gradeStats).toMatchObject({ count: 6 });
+    await api().post(`/api/assignments/${a.id}/release`).set(lect).send({ released: true });
+    const stats = (await api().get(`/api/assignments/${a.id}`).set(students[0])).body.gradeStats;
+    expect(stats).toMatchObject({ count: 6, mean: 73.3, median: 77.5, binWidth: 10 });
+    expect(stats.bins).toEqual([0, 0, 0, 0, 1, 1, 0, 1, 1, 2]);
   });
 });

@@ -16,6 +16,14 @@ const assignmentSchema = new Schema(
     status: { type: String, enum: ['draft', 'published'], default: 'draft' },
     /** Students see grades and lecturer feedback only once released. */
     gradesReleased: { type: Boolean, default: false },
+    /** Anonymous class patterns for student comparisons (regenerated when more submissions are reviewed). */
+    classPatterns: {
+      type: new Schema(
+        { approaches: [new Schema({ description: String, count: Number }, { _id: false })], commonStrengths: [String], commonGaps: [String], basedOn: Number, generatedAt: Date },
+        { _id: false },
+      ),
+      default: undefined,
+    },
     classOverview: {
       type: new Schema({ summary: String, commonIssues: [String], strengths: [String], generatedAt: Date, basedOn: Number }, { _id: false }),
       default: undefined,
@@ -52,11 +60,29 @@ const submissionSchema = new Schema(
       status: { type: String, enum: ['queued', 'running', 'done', 'failed'], default: 'queued' },
       error: { type: String, default: '' },
       summary: { type: String, default: '' },
+      approach: { type: String, default: '' },
       strengths: { type: [String], default: [] },
       improvements: { type: [String], default: [] },
       criteria: { type: [reviewCriterionSchema], default: [] },
       model: { type: String, default: '' },
       reviewedAt: { type: Date },
+    },
+    /** The student's comparison with the class (after the deadline, on request). */
+    comparison: {
+      type: new Schema(
+        {
+          status: { type: String, enum: ['queued', 'running', 'done', 'failed'] },
+          error: String,
+          summary: String,
+          likeMost: [String],
+          othersDid: [String],
+          standOut: [String],
+          classSize: Number,
+          generatedAt: Date,
+        },
+        { _id: false },
+      ),
+      default: undefined,
     },
     grade: {
       type: new Schema(

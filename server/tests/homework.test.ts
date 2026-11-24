@@ -85,3 +85,26 @@ describe('review helpers', () => {
     expect(t.text).toContain('=== קובץ: b.py ===');
   });
 });
+
+describe('compareToClass facts', () => {
+  it('derives the lists from per-criterion numbers', async () => {
+    const { compareToClass } = await import('../src/lib/assignments/review');
+    const llm = async () => ({ summary: 'סיכום', othersDid: ['ignored'], standOut: ['ignored'] });
+    const c = await compareToClass(
+      { title: 't', criteria: [
+        { id: 'a', title: 'מקרה בסיס', description: '', points: 1 },
+        { id: 'b', title: 'סיבוכיות', description: '', points: 1 },
+        { id: 'c', title: 'קלט שלילי', description: '', points: 1 },
+      ] },
+      { approach: '', summary: '', strengths: [], improvements: [], criteria: [{ criterionId: 'a', met: 'yes' }, { criterionId: 'b', met: 'partial' }, { criterionId: 'c', met: 'yes' }] },
+      { approaches: [], commonStrengths: [], commonGaps: [] },
+      { a: 90, b: 67, c: 20 },
+      6,
+      llm,
+    );
+    expect(c.likeMost).toEqual(['מקרה בסיס: עמדת בדרישה, כמו 90% מהכיתה']);
+    expect(c.othersDid).toEqual(['סיבוכיות: 67% מהכיתה עמדו בדרישה, ואצלך זה חלקי']);
+    expect(c.standOut).toEqual(['קלט שלילי: עמדת בדרישה, ורק 20% מהכיתה עמדו בה']);
+    expect(c.summary).toBe('סיכום');
+  });
+});

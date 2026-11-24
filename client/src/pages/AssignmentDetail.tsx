@@ -14,6 +14,7 @@ import {
 } from '../api';
 import { useAuth } from '../auth';
 import { TextLink } from '../components/Bento';
+import GradeChart from '../components/GradeChart';
 import { BackLink, ErrorBox, ghostButton, pillButton } from '../components/ui';
 import { AssignmentEditor, draftBody, draftFrom, dueText } from './CourseAssignments';
 
@@ -116,6 +117,75 @@ function Upload({ aid, kind, label, disabled, onDone }: { aid: string; kind: 'fi
 
 // ───────────────────────── Student ─────────────────────────
 
+/** After the deadline: the student's work compared with anonymous class patterns. */
+function Comparison({ final, open, dueAt, onRequested }: { final: SubmissionView; open: boolean; dueAt: string; onRequested: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const c = final.comparison;
+  const running = c?.status === 'queued' || c?.status === 'running';
+  async function request() {
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/submissions/${final.id}/compare`, { method: 'POST' });
+      onRequested();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const list = (title: string, items: string[]) =>
+    items.length > 0 && (
+      <div>
+        <p className="mb-1 text-sm font-medium">{title}</p>
+        <ul className="list-disc space-y-0.5 ps-5 text-sm text-ink-2">
+          {items.map((x, i) => (
+            <li key={i}>{x}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  return (
+    <section className="tile space-y-4 p-6">
+      <div>
+        <h2 className="text-lg">השוואה לכיתה</h2>
+        <p className="mt-1 text-sm text-ink-3">
+          {open
+            ? 'איך ההגשה שלך נראית לעומת שאר הכיתה: גישות נפוצות, מה אחרים עשו ומה חסר אצלך. ההשוואה אנונימית לגמרי ולא מציגה עבודות של אחרים.'
+            : `תיפתח אחרי מועד ההגשה (${dueText(dueAt)}), כדי שלא תרמוז על פתרונות לפני ההגשה.`}
+        </p>
+      </div>
+      {open && !c && (
+        <button type="button" disabled={busy || final.review.status !== 'done'} onClick={request} className={pillButton}>
+          השוואה לכיתה
+        </button>
+      )}
+      {running && <p className="text-ink-2">משווה את ההגשה שלך לכיתה… זה לוקח פחות מדקה.</p>}
+      {c?.status === 'failed' && (
+        <div className="space-y-2">
+          <p className="text-bad">ההשוואה נכשלה{c.error ? ` (${c.error})` : ''}.</p>
+          <button type="button" disabled={busy} onClick={request} className={ghostButton}>
+            ניסיון חוזר
+          </button>
+        </div>
+      )}
+      {c?.status === 'done' && (
+        <div className="space-y-4">
+          <p className="leading-relaxed">{c.summary}</p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {list('כמו רוב הכיתה', c.likeMost)}
+            {list('אחרים עשו, ואצלך חסר', c.othersDid)}
+            {list('בולט לטובה אצלך', c.standOut)}
+          </div>
+          <p className="text-xs text-ink-3">בהשוואה ל-{c.classSize} הגשות אחרות. נכתב אוטומטית מתוך הבדיקות, בלי גישה לעבודות של אחרים.</p>
+        </div>
+      )}
+      <ErrorBox>{error}</ErrorBox>
+    </section>
+  );
+}
+
 function StudentView({ data, reload }: { data: StudentAssignmentDetail; reload: () => void }) {
   const a = data.assignment;
   const overdue = new Date(a.dueAt).getTime() < Date.now();
@@ -171,6 +241,15 @@ function StudentView({ data, reload }: { data: StudentAssignmentDetail; reload: 
         <section className="tile p-6">
           <h2 className="mb-4 text-lg">משוב על ההגשה</h2>
           <ReviewPanel review={final.review} criteria={a.criteria} shares={data.classShares} />
+        </section>
+      )}
+
+      {final && <Comparison final={final} open={data.comparisonOpen} dueAt={a.dueAt} onRequested={reload} />}
+
+      {data.gradeStats && final?.grade && (
+        <section className="tile p-6">
+          <h2 className="mb-4 text-lg">איפה הציון שלך ביחס לכיתה</h2>
+          <GradeChart stats={data.gradeStats} maxPoints={a.maxPoints} mine={final.grade.points} />
         </section>
       )}
 
@@ -358,6 +437,13 @@ function LecturerView({ data, reload }: { data: LecturerAssignmentDetail; reload
         </section>
       )}
 
+      {data.gradeStats && (
+        <section className="tile p-6">
+          <h2 className="mb-4 text-lg">התפלגות ציונים</h2>
+          <GradeChart stats={data.gradeStats} maxPoints={a.maxPoints} />
+        </section>
+      )}
+
       {data.submissions.length >= 2 && (
         <section className="tile space-y-3 p-6">
           <div className="flex items-baseline justify-between gap-3">
@@ -413,7 +499,9 @@ export default function AssignmentDetail() {
 
   const busy =
     !!data &&
-    ('submissions' in data ? data.submissions.some((s) => reviewBusy(s.review)) : !!(data.final && reviewBusy(data.final.review)) || data.practice.some((p) => reviewBusy(p.review)));
+    ('submissions' in data
+      ? data.submissions.some((s) => reviewBusy(s.review))
+      : !!(data.final && (reviewBusy(data.final.review) || (data.final.comparison && reviewBusy(data.final.comparison)))) || data.practice.some((p) => reviewBusy(p.review)));
   useEffect(() => {
     load();
   }, [load]);

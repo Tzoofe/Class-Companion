@@ -95,6 +95,9 @@ const HEBREW_ERRORS: Record<string, string> = {
   'Invalid grade': 'הציון לא תקין',
   'Not enough reviewed submissions yet': 'צריך לפחות 2 הגשות שנבדקו',
   'Instructions are too long': 'ההוראות ארוכות מדי',
+  'Comparison opens after the deadline': 'ההשוואה לכיתה נפתחת אחרי מועד ההגשה',
+  'Wait for your review first': 'קודם צריך שהבדיקה של ההגשה שלך תסתיים',
+  'Not enough classmates reviewed yet': 'עוד אין מספיק הגשות שנבדקו בכיתה (צריך לפחות 5)',
   'Unsupported file type': 'סוג קובץ לא נתמך. אפשר להעלות הקלטה (mp4, m4a, mp3, wav, webm, mov) או תמלול (vtt, srt, txt)',
   'The transcript is empty': 'התמלול ריק',
   'The file is empty': 'הקובץ ריק',
@@ -623,6 +626,15 @@ export interface SubmissionView {
   suggestedPoints?: number | null;
   grade: { points: number; criteria: { criterionId: string; points: number }[]; comment: string; gradedAt: string } | null;
   practiceUsed?: number;
+  comparison: { status: 'queued' | 'running' | 'done' | 'failed'; error: string; summary: string; likeMost: string[]; othersDid: string[]; standOut: string[]; classSize: number; generatedAt: string | null } | null;
+}
+
+export interface GradeStats {
+  count: number;
+  mean: number;
+  median: number;
+  bins: number[];
+  binWidth: number;
 }
 
 export interface LecturerAssignmentListItem extends AssignmentBase {
@@ -637,6 +649,7 @@ export interface LecturerAssignmentDetail {
   assignment: AssignmentBase & { classOverview: { summary: string; commonIssues: string[]; strengths: string[]; generatedAt: string; basedOn: number } | null };
   submissions: SubmissionView[];
   missing: { email: string; name: string }[];
+  gradeStats: GradeStats | null;
 }
 
 export interface StudentAssignmentDetail {
@@ -646,6 +659,8 @@ export interface StudentAssignmentDetail {
   practice: SubmissionView[];
   practiceLeft: number;
   classShares: Record<string, number> | null;
+  comparisonOpen: boolean;
+  gradeStats: GradeStats | null;
 }
 
 export const reviewBusy = (r: { status: string }) => r.status === 'queued' || r.status === 'running';
