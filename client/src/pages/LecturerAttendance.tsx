@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ATTENDANCE_RULES } from '../../../shared/attendance';
 import { api, ApiError, type CourseSessionsList, type LiveSession, type SessionStatus } from '../api';
+import LocationGate, { LocationHelp } from '../components/LocationGate';
 import { OpenOnPhoneQr } from '../components/PhoneOnly';
 import SessionRoster from '../components/SessionRoster';
 import { ErrorBox, primaryButton } from '../components/ui';
@@ -13,7 +14,7 @@ const MAX_ACC = ATTENDANCE_RULES.lecturerMaxAccuracyM;
 
 /** Waits for a precise location, then lets the lecturer start the session. */
 function StartSession({ courseId, onStarted }: { courseId: string; onStarted: (s: LiveSession) => void }) {
-  const { recentBest, count, error: geoError } = useLocationWatch(10_000);
+  const { recentBest, count, error: geoError, denied } = useLocationWatch(10_000);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [laptop] = useState(() => !isMobileDevice());
@@ -63,7 +64,7 @@ function StartSession({ courseId, onStarted }: { courseId: string; onStarted: (s
             : 'עמדו בתוך הכיתה, רצוי ליד שולחן המרצה. Wi-Fi דלוק משפר את הדיוק בתוך מבנים.'}
         </p>
       )}
-      <ErrorBox>{geoError || error}</ErrorBox>
+      {denied ? <LocationHelp kind="denied" /> : <ErrorBox>{geoError || error}</ErrorBox>}
 
       <button type="button" onClick={start} disabled={!precise || busy} className={`${primaryButton} py-4 text-lg`}>
         {busy ? '…' : 'התחל נוכחות'}
@@ -224,7 +225,9 @@ export default function LecturerAttendance() {
       {sessionId === undefined && !error && <p className="text-center text-slate-500">טוען…</p>}
       {sessionId === null && (
         <>
-          <StartSession courseId={id} onStarted={(s) => setSessionId(s.id)} />
+          <LocationGate purpose="מרכז הכיתה נקבע לפי המיקום שלך כשאת/ה פותח/ת נוכחות.">
+            <StartSession courseId={id} onStarted={(s) => setSessionId(s.id)} />
+          </LocationGate>
           <LastSessionLink courseId={id} />
         </>
       )}

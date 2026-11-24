@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ATTENDANCE_RULES } from '../../../shared/attendance';
 import { api, ApiError, type RangeResult, type StudentActive } from '../api';
+import LocationGate, { APPROXIMATE_LOCATION_M, LocationHelp } from '../components/LocationGate';
 import PhoneOnly from '../components/PhoneOnly';
 import StudentCourseTabs from '../components/StudentCourseTabs';
 import { ErrorBox } from '../components/ui';
@@ -27,7 +28,7 @@ function Done({ checkedInAt }: { checkedInAt: string }) {
 
 /** Watches location, asks the server whether we're in range, and shows "I'm here" when we are. */
 function CheckInFlow({ sessionId, onDone, onClosed }: { sessionId: string; onDone: (at: string) => void; onClosed: () => void }) {
-  const { latest, recentBest, error: geoError } = useLocationWatch(10_000);
+  const { latest, recentBest, error: geoError, denied } = useLocationWatch(10_000);
   const [range, setRange] = useState<RangeResult | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -76,16 +77,18 @@ function CheckInFlow({ sessionId, onDone, onClosed }: { sessionId: string; onDon
     }
   }
 
+  if (denied) return <LocationHelp kind="denied" />;
   if (geoError) return <ErrorBox>{geoError}</ErrorBox>;
   if (!recentBest) return <p className="py-10 text-center text-slate-500">מאתר את מיקומך…</p>;
 
+  if (imprecise && recentBest.accuracy > APPROXIMATE_LOCATION_M) return <LocationHelp kind="approximate" />;
   if (imprecise) {
     return (
       <div className="space-y-3 rounded-xl bg-amber-50 p-6 text-center ring-1 ring-amber-200">
-        <p className="text-lg font-semibold text-amber-900">המיקום לא מדויק מספיק</p>
+        <p className="text-lg font-semibold text-amber-900">מחפש מיקום מדויק יותר…</p>
         <p className="text-sm text-amber-800">
-          כרגע ±{Math.round(recentBest.accuracy)} מ׳ (נדרש עד {MAX_ACC} מ׳). הפעילו <strong>מיקום מדויק</strong> עבור Safari/Chrome
-          בהגדרות הטלפון, והדליקו Wi-Fi.
+          כרגע ±{Math.round(recentBest.accuracy)} מ׳ (נדרש עד {MAX_ACC} מ׳). זה קורה לפעמים בתוך מבנים: ודאו שה-Wi-Fi דלוק (גם בלי
+          להתחבר לרשת) והמתינו כמה שניות — הבדיקה ממשיכה אוטומטית.
         </p>
       </div>
     );
@@ -179,7 +182,9 @@ export default function StudentCheckIn() {
           ) : session ? (
             <>
               <p className="text-center text-sm text-slate-500">נוכחות פתוחה עד {timeOf(session.endsAt)}</p>
-              <CheckInFlow sessionId={session.id} onDone={setDoneAt} onClosed={() => setClosed(true)} />
+              <LocationGate purpose="כדי לסמן נוכחות, האפליקציה צריכה לבדוק שאת/ה בכיתה. המיקום משמש רק לבדיקה הזו.">
+                <CheckInFlow sessionId={session.id} onDone={setDoneAt} onClosed={() => setClosed(true)} />
+              </LocationGate>
             </>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">

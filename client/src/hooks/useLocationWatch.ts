@@ -15,6 +15,8 @@ export interface LocationWatch {
   recentBest: Reading | null;
   count: number;
   error: string | null;
+  /** The browser refused access to location (permission denied). */
+  denied: boolean;
 }
 
 const ERROR_TEXT: Record<number, string> = {
@@ -38,6 +40,7 @@ export function useLocationWatch(windowMs = 10_000): LocationWatch {
     recent: [],
     count: 0,
     error: null,
+    denied: false,
   });
 
   useEffect(() => {
@@ -62,10 +65,11 @@ export function useLocationWatch(windowMs = 10_000): LocationWatch {
             recent,
             count: s.count + 1,
             error: null,
+            denied: false,
           };
         });
       },
-      (err) => setState((s) => ({ ...s, error: ERROR_TEXT[err.code] ?? err.message })),
+      (err) => setState((s) => ({ ...s, error: ERROR_TEXT[err.code] ?? err.message, denied: err.code === 1 })),
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
     );
     return () => navigator.geolocation.clearWatch(id);
