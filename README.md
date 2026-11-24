@@ -8,6 +8,10 @@ A mobile-first web app for classroom attendance based on phone GPS proximity, wi
 > the lecturer's phone, GPS check-in for students ("I'm here"), and the location-accuracy debug tool
 > (`/debug/location`).
 
+## Documents
+
+Statement of Work, SRS, use cases, components, and class and sequence diagrams are in [docs/](docs/README.md).
+
 ## Stack
 
 | Part | Tech |
