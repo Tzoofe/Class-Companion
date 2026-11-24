@@ -42,6 +42,12 @@ const HEBREW_ERRORS: Record<string, string> = {
   'Already checked in': 'נוכחותך כבר נרשמה',
   'Marked absent by lecturer': 'המרצה סימן/ה שלא נכחת במפגש הזה — אם זו טעות, פנו למרצה',
   'Student not on roster': 'הסטודנט/ית לא ברשימת הקורס',
+  'Post text is required': 'כתבו משהו לפני השליחה',
+  'Post is too long': 'הטקסט ארוך מדי (עד 500 תווים)',
+  'Reply is too long': 'התגובה ארוכה מדי (עד 1000 תווים)',
+  'Too many posts, wait a minute': 'שלחת הרבה הודעות ברצף — נסו שוב בעוד דקה',
+  'Post not found': 'ההודעה לא נמצאה (אולי נמחקה)',
+  'Cannot vote for your own post': 'אי אפשר להצביע להודעה שלך',
 };
 
 export class ApiError extends Error {
@@ -177,6 +183,7 @@ export interface CourseDashboard {
   history: { id: string; startsAt: string; present: number }[];
   atRisk: { email: string; firstName: string; lastName: string; attended: number; percent: number }[];
   atRiskThreshold: number;
+  feed: { openQuestions: number; totalPosts: number };
 }
 
 export interface SessionRosterRow {
@@ -228,3 +235,31 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+
+export type PostKind = 'question' | 'suggestion';
+
+export interface FeedPost {
+  id: string;
+  kind: PostKind;
+  text: string;
+  createdAt: string;
+  duringClass: boolean;
+  /** null = anonymous and not yours (the server never sends the name). */
+  author: string | null;
+  anonymous: boolean;
+  mine: boolean;
+  votes: number;
+  votedByMe: boolean;
+  status: 'open' | 'answered';
+  pinned: boolean;
+  hidden: boolean;
+  reply: { text: string; at: string } | null;
+}
+
+export interface CourseFeed {
+  course: { id: string; name: string };
+  posts: FeedPost[];
+  serverNow: string;
+}
+
+export const POST_MAX_LENGTH = 500;

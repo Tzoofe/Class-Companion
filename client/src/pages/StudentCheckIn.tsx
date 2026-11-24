@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ATTENDANCE_RULES } from '../../../shared/attendance';
 import { api, ApiError, type RangeResult, type StudentActive } from '../api';
 import PhoneOnly from '../components/PhoneOnly';
+import StudentCourseTabs from '../components/StudentCourseTabs';
 import { ErrorBox } from '../components/ui';
 import { useLocationWatch, type Reading } from '../hooks/useLocationWatch';
 
@@ -162,6 +163,7 @@ export default function StudentCheckIn() {
         → הקורסים שלי
       </Link>
       {state && <h1 className="text-xl font-bold">{state.courseName}</h1>}
+      <StudentCourseTabs courseId={id} active="checkin" />
       <PhoneOnly>
         <ErrorBox>{error}</ErrorBox>
         {!state && !error && <p className="text-center text-slate-500">טוען…</p>}

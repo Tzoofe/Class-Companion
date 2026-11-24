@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { ATTENDANCE_RULES, isPreciseEnoughToStart } from '../../../shared/attendance.js';
 import { announceSessionStarted } from '../lib/push.js';
+import { findAccessibleCourse, findOwnCourse } from '../lib/access.js';
 import { buildCourseWorkbook } from '../lib/export.js';
 import { parseRosterFile } from '../lib/roster.js';
 import { closeExpiredSessions, toPublicSession, toStudentSession } from '../lib/sessions.js';
@@ -10,6 +11,8 @@ import { buildDashboard, buildStudentRows, isSessionActive } from '../lib/stats.
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { config } from '../config.js';
 import { Attendance, PRESENT } from '../models/Attendance.js';
+import { Post } from '../models/Post.js';
+import { countOpenQuestions } from './posts.js';
 import { Course } from '../models/Course.js';
 import { Session } from '../models/Session.js';
 import { User } from '../models/User.js';
@@ -164,7 +167,8 @@ coursesRouter.get('/:id/dashboard', requireRole('lecturer'), async (req, res) =>
     attendance: attendance.map((a) => ({ sessionId: String(a.sessionId), email: a.email })),
     now: new Date(),
   });
-  res.json({ course: { id: course.id, name: course.name, defaultRadiusM: course.defaultRadiusM }, ...dashboard });
+  const [openQuestions, totalPosts] = await Promise.all([countOpenQuestions(course._id), Post.countDocuments({ courseId: course._id, hidden: false })]);
+  res.json({ course: { id: course.id, name: course.name, defaultRadiusM: course.defaultRadiusM }, ...dashboard, feed: { openQuestions, totalPosts } });
 });
 
 /** All sessions of a course, newest first, with how many attended each. Lecturer-only. */
@@ -200,7 +204,10 @@ coursesRouter.get('/:id/export', requireRole('lecturer'), async (req, res) => {
     User.find({ email: { $in: course.roster.map((r) => r.email) } }, { email: 1 }),
     Session.find({ courseId: course._id }, { status: 1, startsAt: 1, endsAt: 1 }),
   ]);
-  const records = await Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) } });
+  const [records, posts] = await Promise.all([
+    Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) } }),
+    Post.find({ courseId: course._id }).sort({ createdAt: 1 }).populate('authorId', 'email'),
+  ]);
   const now = new Date();
   const wb = buildCourseWorkbook({
     courseName: course.name,
@@ -216,6 +223,19 @@ coursesRouter.get('/:id/export', requireRole('lecturer'), async (req, res) => {
       distanceM: r.distanceM,
       accuracyM: r.accuracyM,
     })),
+    posts: posts.map((p) => ({
+      createdAt: p.createdAt,
+      kind: p.kind,
+      text: p.text,
+      authorEmail: (p.authorId as unknown as { email?: string } | null)?.email ?? '',
+      anonymous: p.anonymous,
+      votes: p.voterIds.length,
+      status: p.status,
+      pinned: p.pinned,
+      hidden: p.hidden,
+      duringClass: !!p.sessionId,
+      reply: p.reply?.text ?? '',
+    })),
     now,
     timeZone: config.timeZone,
   });
@@ -225,18 +245,6 @@ coursesRouter.get('/:id/export', requireRole('lecturer'), async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="attendance-${date}.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}`);
   res.send(Buffer.from(await wb.xlsx.writeBuffer()));
 });
-
-function findOwnCourse(id: string, lecturerId: string) {
-  return mongoose.isValidObjectId(id) ? Course.findOne({ _id: id, lecturerId }) : Promise.resolve(null);
-}
-
-/** Lecturer: own course. Student: course whose roster lists their email. */
-async function findAccessibleCourse(id: string, auth: { sub: string; role: string }) {
-  if (!mongoose.isValidObjectId(id)) return null;
-  if (auth.role === 'lecturer') return Course.findOne({ _id: id, lecturerId: auth.sub });
-  const me = await User.findById(auth.sub, { email: 1 });
-  return me ? Course.findOne({ _id: id, 'roster.email': me.email }) : null;
-}
 
 /** The course's currently active session, or null. */
 coursesRouter.get('/:id/sessions/active', async (req, res) => {

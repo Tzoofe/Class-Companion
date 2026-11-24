@@ -74,6 +74,16 @@ export async function notifyUsers(userIds: string[], payload: PushPayload, ttlSe
   return { sent, removed: gone.length };
 }
 
+/** Fire-and-forget notifyUsers (tracked so tests can wait for it). */
+export function notifyInBackground(userIds: string[], payload: PushPayload, ttlSeconds?: number) {
+  track(notifyUsers(userIds, payload, ttlSeconds).catch((e) => console.error('notify failed', e)));
+}
+
+function track(job: Promise<unknown>) {
+  pending.add(job);
+  void job.finally(() => pending.delete(job));
+}
+
 /** Tells the course's (signed-up) students that attendance is open. Runs in the background. */
 export function announceSessionStarted(course: { id: string; name: string; roster: { email: string }[] }) {
   const job = (async () => {
@@ -89,6 +99,5 @@ export function announceSessionStarted(course: { id: string; name: string; roste
       ATTENDANCE_RULES.defaultSessionMinutes * 60,
     );
   })().catch((e) => console.error('announce failed', e));
-  pending.add(job);
-  void job.finally(() => pending.delete(job));
+  track(job);
 }

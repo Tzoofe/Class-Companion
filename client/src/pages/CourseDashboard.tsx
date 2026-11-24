@@ -242,6 +242,23 @@ export default function CourseDashboard() {
           )}
         </Card>
 
+        <Card
+          title="שאלות והערות"
+          action={
+            <Link to={`/courses/${course.id}/feed/present`} className="text-sm text-indigo-700 hover:underline">
+              מסך הקרנה
+            </Link>
+          }
+        >
+          <Link to={`/courses/${course.id}/feed`} className="block rounded-lg p-1 hover:bg-slate-50">
+            <span className="text-3xl font-bold tabular-nums">{data.feed.openQuestions}</span>
+            <span className="ms-2 text-sm text-slate-600">שאלות פתוחות</span>
+            <span className="mt-1 block text-xs text-slate-500">
+              {data.feed.totalPosts} הודעות בסך הכל · לפיד ←
+            </span>
+          </Link>
+        </Card>
+
         <Card title="מטלות">
           <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
             <p className="font-medium text-slate-600">בקרוב</p>

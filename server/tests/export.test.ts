@@ -61,6 +61,18 @@ describe('buildCourseWorkbook', () => {
     expect(ws.getRow(6).getCell(8).value).toEqual(new Date('2026-11-17T10:03:00Z')); // local wall clock
   });
 
+  it('adds a questions & comments sheet with real names, only when there are posts', () => {
+    expect(buildCourseWorkbook(input).getWorksheet('שאלות והערות')).toBeUndefined();
+    const wb = buildCourseWorkbook({
+      ...input,
+      posts: [
+        { createdAt: new Date('2026-11-24T08:05:00Z'), kind: 'question', text: 'מה זה?', authorEmail: 'dana@x.com', anonymous: true, votes: 3, status: 'answered', pinned: true, hidden: false, duringClass: true, reply: 'ככה' },
+      ],
+    });
+    const ws = wb.getWorksheet('שאלות והערות')!;
+    expect((ws.getRow(5).values as unknown[]).slice(1)).toEqual([new Date('2026-11-24T10:05:00Z'), 'שאלה', 'מה זה?', 'דנה כהן', 'כן', 3, 'נענה · נעוץ', 'כן', 'ככה']);
+  });
+
   it('lists every student per session with source, time, distance and accuracy', () => {
     const wb = buildCourseWorkbook(input);
     const first = wb.getWorksheet('17.11.26 10.00')!;

@@ -11,12 +11,28 @@ export interface ExportRecord {
   accuracyM?: number | null;
 }
 
+export interface ExportPost {
+  createdAt: Date;
+  kind: string;
+  text: string;
+  authorEmail: string;
+  anonymous: boolean;
+  votes: number;
+  status: string;
+  pinned: boolean;
+  hidden: boolean;
+  duringClass: boolean;
+  reply: string;
+}
+
 export interface ExportInput {
   courseName: string;
   roster: StatsInput['roster'];
   users: StatsInput['users'];
   sessions: { id: string; status: string; startsAt: Date; endsAt: Date }[];
   records: ExportRecord[];
+  /** Course feed (questions & suggestions); its sheet is added only when there are posts. */
+  posts?: ExportPost[];
   now: Date;
   timeZone: string;
 }
@@ -58,7 +74,7 @@ function styleSheet(ws: ExcelJS.Worksheet, headerRow: number) {
 }
 
 /** Summary sheet + one sheet per session (oldest first). */
-export function buildCourseWorkbook({ courseName, roster, users, sessions, records, now, timeZone }: ExportInput): ExcelJS.Workbook {
+export function buildCourseWorkbook({ courseName, roster, users, sessions, records, posts = [], now, timeZone }: ExportInput): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Class Companion';
   wb.created = now;
@@ -99,7 +115,7 @@ export function buildCourseWorkbook({ courseName, roster, users, sessions, recor
 
   // One sheet per session
   const byKey = new Map(records.map((r) => [`${r.sessionId}|${r.email.toLowerCase()}`, r]));
-  const taken = new Set(['סיכום']);
+  const taken = new Set(['סיכום', 'שאלות והערות']);
   for (const session of ordered) {
     const ws = wb.addWorksheet(sessionSheetName(session.startsAt, timeZone, taken));
     const count = present.filter((r) => r.sessionId === session.id).length;
@@ -135,6 +151,34 @@ export function buildCourseWorkbook({ courseName, roster, users, sessions, recor
       ]);
       row.getCell(6).numFmt = TIME;
       if (here) row.getCell(4).font = { color: { argb: 'FF047857' }, bold: true };
+    }
+    styleSheet(ws, 4);
+  }
+
+  if (posts.length > 0) {
+    const nameByEmail = new Map(roster.map((r) => [r.email.toLowerCase(), `${r.firstName} ${r.lastName}`.trim()]));
+    const ws = wb.addWorksheet('שאלות והערות');
+    ws.addRow([courseName]).font = { bold: true, size: 14 };
+    ws.addRow([`${posts.length} פרסומים`]);
+    ws.addRow([]);
+    ws.columns = [{ width: 16 }, { width: 10 }, { width: 60 }, { width: 18 }, { width: 10 }, { width: 8 }, { width: 10 }, { width: 10 }, { width: 40 }];
+    ws.addRow(['תאריך', 'סוג', 'תוכן', 'מאת', 'אנונימי', '👍', 'סטטוס', 'בזמן שיעור', 'תגובת המרצה']);
+    for (const p of posts) {
+      const status = p.hidden ? 'מוסתר' : p.status === 'answered' ? 'נענה' : 'פתוח';
+      const row = ws.addRow([
+        local(p.createdAt),
+        p.kind === 'question' ? 'שאלה' : 'הצעה',
+        p.text,
+        nameByEmail.get(p.authorEmail.toLowerCase()) || p.authorEmail,
+        p.anonymous ? 'כן' : 'לא',
+        p.votes,
+        p.pinned ? `${status} · נעוץ` : status,
+        p.duringClass ? 'כן' : 'לא',
+        p.reply || null,
+      ]);
+      row.getCell(1).numFmt = DATE_TIME;
+      row.getCell(3).alignment = { wrapText: true, vertical: 'top' };
+      row.getCell(9).alignment = { wrapText: true, vertical: 'top' };
     }
     styleSheet(ws, 4);
   }

@@ -4,7 +4,7 @@ A mobile-first web app for classroom attendance based on phone GPS proximity, wi
 
 > **Status:** early development. Available now: accounts (lecturer / student), course creation from a
 > roster file, a course dashboard (attendance per session, students who need attention, assignments placeholder),
-> a student list with per-student attendance, starting / closing an attendance session from
+> a student list with per-student attendance, a questions & suggestions feed (anonymous option, votes, projector view), starting / closing an attendance session from
 > the lecturer's phone, GPS check-in for students ("I'm here"), and the location-accuracy debug tool
 > (`/debug/location`).
 
@@ -90,10 +90,25 @@ Geolocation on a phone requires HTTPS — see [docs/PHONE_TESTING.md](docs/PHONE
 
 Authenticated requests send `Authorization: Bearer <token>`.
 
+| GET | `/api/courses/:id/posts` | lecturer (own) / student (on roster) | course feed; students never receive the author of others' anonymous posts, nor posts the lecturer hid |
+| POST | `/api/courses/:id/posts` | student (on roster) | `{ kind: question\|suggestion, text ≤ 500, anonymous, clientId }`; idempotent per `clientId`; 5/min; tagged "during class" if attendance is open |
+| POST | `/api/posts/:id/vote` | student | `{ up }` — one 👍 per student, not on your own post |
+| PATCH | `/api/posts/:id` | lecturer (own course) | `{ status?, pinned?, hidden?, reply? }`; a reply marks it answered; the author gets a push |
+| DELETE | `/api/posts/:id` | author / lecturer | delete a post |
 | GET | `/api/push/public-key` | public | VAPID public key for subscribing (`null` if push isn't configured) |
 | POST | `/api/push/subscribe` | any | save this device's push subscription (`PushSubscription.toJSON()`); endpoint must be a known push service |
 | POST | `/api/push/unsubscribe` | any | `{ endpoint }` — remove one of your own devices |
 | POST | `/api/push/test` | any | send a test notification to all of your devices |
+
+## Questions & suggestions (feed)
+
+Each course has a feed where students post ❓ questions and 💡 suggestions, during class or any time, and
+upvote each other's posts. **Anonymous** posts hide the author from other students only; the lecturer always
+sees who wrote them. The lecturer marks posts answered, replies (the student gets a push notification),
+pins and hides them, and can open a full-screen **projector view** (`/courses/:id/feed/present`) with open
+questions sorted by votes and a QR code to join. Posts written without a connection are kept on the phone
+and sent automatically when it reconnects (safe to retry: the server de-duplicates by `clientId`). The
+export adds a *שאלות והערות* sheet.
 
 ## Push notifications
 

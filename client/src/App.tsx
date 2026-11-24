@@ -4,11 +4,13 @@ import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
 import AuthForm from './pages/AuthForm';
 import CourseDashboard from './pages/CourseDashboard';
+import CourseFeed from './pages/CourseFeed';
 import CourseSessions from './pages/CourseSessions';
 import CourseStudents from './pages/CourseStudents';
 import Courses from './pages/Courses';
 import LecturerAttendance from './pages/LecturerAttendance';
 import DebugLocation from './pages/DebugLocation';
+import FeedPresent from './pages/FeedPresent';
 import NewCourse from './pages/NewCourse';
 import SessionDetail from './pages/SessionDetail';
 import StudentCheckIn from './pages/StudentCheckIn';
@@ -21,8 +23,12 @@ export default function App() {
         <Route path="/signup" element={<AuthForm mode="signup" />} />
         <Route path="/debug/location" element={<DebugLocation />} />
         <Route element={<RequireAuth />}>
+          <Route element={<RequireAuth role="lecturer" />}>
+            <Route path="/courses/:id/feed/present" element={<FeedPresent />} />
+          </Route>
           <Route element={<Layout />}>
             <Route path="/courses" element={<Courses />} />
+            <Route path="/courses/:id/feed" element={<CourseFeed />} />
             <Route element={<RequireAuth role="student" />}>
               <Route path="/courses/:id/checkin" element={<StudentCheckIn />} />
             </Route>
