@@ -1,12 +1,17 @@
 # Class Companion
 
-A mobile-first web app for classroom attendance based on phone GPS proximity, with a lecturer dashboard.
+A mobile-first web app (installable PWA) for classroom attendance and participation, built for the
+Introduction to Software Engineering course at Ariel University.
 
-> **Status:** early development. Available now: accounts (lecturer / student), course creation from a
-> roster file, a course dashboard (attendance per session, students who need attention, assignments placeholder),
-> a student list with per-student attendance, a questions & suggestions feed (anonymous option, votes, projector view), live polls, starting / closing an attendance session from
-> the lecturer's phone, GPS check-in for students ("I'm here"), and the location-accuracy debug tool
-> (`/debug/location`).
+- **Attendance:** location-verified check-in from the phone, manual marking, statistics and Excel export.
+- **Questions and suggestions:** a course feed with votes, anonymity towards classmates, replies and a projector view.
+- **Polls:** live polls of several types with results on the projector.
+- **Lesson summaries:** local transcription and a local model turn a lesson recording into a summary.
+- **Homework review:** a local model reviews PDF/ZIP submissions against the lecturer's criteria, with practice
+  reviews, grading and an anonymous comparison with the class.
+- Also: home pages and schedules, push notifications, join with a QR code, and a demo mode.
+
+Everything runs locally with no paid services: the AI features use whisper.cpp and Ollama on the host machine.
 
 ## Documents
 
@@ -18,7 +23,8 @@ Statement of Work, SRS, use cases, components, and class and sequence diagrams a
 |---|---|
 | `client/` | React, Vite, TypeScript, Tailwind CSS, React Router (Hebrew, RTL UI) |
 | `server/` | Node.js, Express, TypeScript (run with `tsx`), MongoDB + Mongoose, JWT auth, Vitest |
-| `shared/` | Pure logic used by both sides (Haversine distance) |
+| `shared/` | Pure logic used by both sides (attendance rules, Haversine distance) |
+| AI | ffmpeg, whisper.cpp, Ollama (`aya-expanse:8b`) |
 
 ## Setup
 
@@ -91,9 +97,6 @@ Geolocation on a phone requires HTTPS — see [docs/PHONE_TESTING.md](docs/PHONE
 | PUT | `/api/sessions/:id/attendance` | lecturer (own) | `{ email, present }` — mark a roster student present/absent, live or after the session |
 | POST | `/api/sessions/:id/range` | student (on roster) | `{ lat, lng, accuracy, timestamp }` → `{ inRange, distanceM, alreadyCheckedIn }`; no side effects |
 | POST | `/api/sessions/:id/check-in` | student (on roster) | re-validates range with a fresh reading (≤ 30 s) and records attendance once (409 if already) |
-
-Authenticated requests send `Authorization: Bearer <token>`.
-
 | GET | `/api/courses/:id/posts` | lecturer (own) / student (on roster) | course feed; students never receive the author of others' anonymous posts, nor posts the lecturer hid |
 | POST | `/api/courses/:id/posts` | student (on roster) | `{ kind: question\|suggestion, text ≤ 500, anonymous, clientId }`; idempotent per `clientId`; 5/min; tagged "during class" if attendance is open |
 | POST | `/api/posts/:id/vote` | student | `{ up }` — one 👍 per student, not on your own post |
@@ -116,6 +119,25 @@ Authenticated requests send `Authorization: Bearer <token>`.
 | POST | `/api/push/subscribe` | any | save this device's push subscription (`PushSubscription.toJSON()`); endpoint must be a known push service |
 | POST | `/api/push/unsubscribe` | any | `{ endpoint }` — remove one of your own devices |
 | POST | `/api/push/test` | any | send a test notification to all of your devices |
+| GET · POST | `/api/courses/:id/summaries` | member · lecturer | list summaries (students: published only) · upload a recording or transcript (raw body) |
+| GET · PUT · DELETE | `/api/summaries/:id` | member · lecturer | read · edit the draft · delete |
+| POST | `/api/summaries/:id/publish` · `/retry` | lecturer | publish (students notified) · retry a failed job |
+| GET · POST | `/api/courses/:id/assignments` | member · lecturer | list (lecturer: counts · student: own status) · create `{ …, publish }` |
+| GET · PUT · DELETE | `/api/assignments/:id` | member · lecturer | lecturer: submissions, missing, class overview, grade stats · student: own final, drafts, class shares, grade stats |
+| POST | `/api/assignments/:id/release` · `/overview` | lecturer | release or hide grades (students notified) · generate a class overview |
+| GET | `/api/assignments/:id/similarity` | lecturer | pairs of similar submissions |
+| POST | `/api/assignments/:id/submissions?kind=final\|practice&fileName=` | student | upload a PDF or ZIP (raw body) |
+| GET | `/api/submissions/:id` · `/file` | lecturer · own student | submission with extracted text · original file |
+| PUT | `/api/submissions/:id/grade` | lecturer | `{ criteria[], comment }` or `{ points }` |
+| POST | `/api/submissions/:id/review` | lecturer | run the AI review again |
+| POST | `/api/submissions/:id/submit` | own student | submit a reviewed draft as the final submission |
+| POST | `/api/submissions/:id/compare` | own student | compare with the class (after the deadline) |
+| GET · POST | `/api/join/:code` | public | course name · join with `{ firstName, lastName, email, password? }` → `{ token, user, courseId }` |
+| GET · POST | `/api/courses/:id/join` | lecturer (own) | who joined · `{ open?, regenerate? }` |
+| POST | `/api/courses/demo` | lecturer | create a demo course with the join link open |
+
+Authenticated requests send `Authorization: Bearer <token>`. The full list is also in
+[docs/04-components.md](docs/04-components.md#5-main-rest-endpoints).
 
 ## Questions & suggestions (feed)
 
@@ -123,7 +145,7 @@ Each course has a feed where students post ❓ questions and 💡 suggestions, d
 upvote each other's posts. **Anonymous** posts hide the author from other students only; the lecturer always
 sees who wrote them. The lecturer marks posts answered, replies (the student gets a push notification),
 pins and hides them, and can open a full-screen **projector view** (`/courses/:id/feed/present`) with open
-questions sorted by votes and a QR code to join. Posts written without a connection are kept on the phone
+questions and suggestions, each labelled, sorted by votes, and a QR code to join. Posts written without a connection are kept on the phone
 and sent automatically when it reconnects (safe to retry: the server de-duplicates by `clientId`). The
 export adds a *שאלות והערות* sheet.
 
@@ -131,7 +153,7 @@ export adds a *שאלות והערות* sheet.
 
 The lecturer uploads a lesson recording (mp4/m4a/mp3/…) or a Zoom transcript (vtt/srt/txt). Everything runs on
 the server machine, free and offline: **ffmpeg** + **whisper.cpp** transcribe Hebrew audio, and a local model
-through **Ollama** (default `aya-expanse:8b`) summarizes it in ~10-minute parts, then writes an overview,
+through **Ollama** (default `aya-expanse:8b`) summarizes it in parts that fit the model's context, then writes an overview,
 review questions and "where students struggled" (using that lesson's feed questions and poll results).
 Topic timestamps come from the transcript. Results are drafts: the lecturer edits and publishes; students get a
 push notification and a "סיכומים" tab. Recordings are deleted after transcription.
@@ -146,10 +168,12 @@ One-time setup (macOS): `brew install ffmpeg whisper-cpp ollama && brew services
 - The lecturer creates assignments (instructions, due date, review criteria with points, practice-review limit) and
   publishes them; due dates appear in the agenda.
 - Students submit a **PDF or ZIP** (code projects: text/code files and PDFs inside are read; junk folders,
-  binaries and hidden files skipped; size and file-count limits). Late submissions are accepted and marked
+  binaries and hidden files skipped; size and file-count limits). Any PDF is accepted: a scan or photo with no
+  text is stored for the lecturer and its AI review is skipped. Late submissions are accepted and marked
   with how late they were. Resubmitting replaces the previous final submission.
 - **Practice reviews:** before submitting, a student can upload drafts for private AI feedback (limited per
-  assignment); the lecturer doesn't see drafts.
+  assignment); the lecturer doesn't see drafts. A reviewed draft can be submitted as the final submission
+  without uploading it again (its review carries over). A draft with no text doesn't use up a practice review.
 - **AI review** (the local model through Ollama, `OLLAMA_MODEL` / `OLLAMA_CODE_MODEL`): per criterion met /
   partial / missing with feedback and a suggestion, strengths and improvements. Suggested points come from the
   verdict (full / half / zero), not from the model. Students also see how the class did on each criterion once
@@ -172,7 +196,8 @@ One-time setup (macOS): `brew install ffmpeg whisper-cpp ollama && brew services
   class in progress, plus their courses.
 - Each course has a **schedule** (weekly slots + optional semester dates) and **one-off events**; students get
   push notifications when upcoming items are added, changed or cancelled. Times are local (`TIME_ZONE`).
-- **Course settings:** rename, default radius, add/remove students, re-upload the roster (merge or replace).
+- **Course settings:** rename, default radius, mandatory attendance, join link (on/off, new code), add/remove
+  students, re-upload the roster (merge or replace).
 - **Mandatory attendance** (per course, default on): only mandatory courses flag students under 70% in
   "needs attention" (course dashboard and lecturer home).
 - **Student signup** requires a university email (`SIGNUP_EMAIL_DOMAINS`, default `msmail.ariel.ac.il`), or any
@@ -191,8 +216,12 @@ see results (and the correct answer) only when the lecturer reveals them; the pr
 
 ## Push notifications
 
-When a lecturer starts attendance, every signed-up student on the roster gets a notification
-("הנוכחות נפתחה · <course>") that opens the check-in page. Students turn it on from the course list.
+Users turn notifications on per device (from the home page). Notifications are sent when:
+
+- attendance opens (opens the check-in page) or a poll opens;
+- the lecturer replies to a post or marks it answered (to its author);
+- the schedule changes, or a lesson summary or assignment is published;
+- an AI review is ready, or grades are released (to the student).
 
 - Needs VAPID keys in `server/.env` (`npx web-push generate-vapid-keys`). Keep the same pair when moving
   servers, or every device must subscribe again.
@@ -224,12 +253,15 @@ Defined once in `shared/attendance.ts` and used by both server and client:
 ## Project layout
 
 ```
-client/src/   pages/, components/, hooks/, api.ts (fetch wrapper), auth.tsx (auth context)
-server/src/   models/, routes/, middleware/, lib/ (auth, roster parsing), seed.ts
-server/tests/ unit tests + API tests (supertest + mongodb-memory-server)
-shared/       geo.ts — Haversine distance, single implementation for client and server
+client/src/   pages/, components/, hooks/, api.ts (fetch wrapper), auth.tsx (auth context),
+              push.ts, outbox.ts (offline posts), theme.ts
+client/public/ sw.js (service worker), manifest, icons
+server/src/   models/, routes/, middleware/, lib/ (domain services; summaries/ and assignments/ for the AI
+              features), seed.ts
+server/tests/ unit tests + API tests (supertest + mongodb-memory-server, fake model)
+shared/       attendance.ts (rules) and geo.ts (Haversine), used by client and server
 samples/      example roster files
-docs/         PHONE_TESTING.md
+docs/         engineering documents (SoW, SRS, use cases, components, design) and PHONE_TESTING.md
 ```
 
 ## Demo mode
