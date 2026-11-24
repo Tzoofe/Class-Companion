@@ -48,6 +48,21 @@ const HEBREW_ERRORS: Record<string, string> = {
   'Too many posts, wait a minute': 'שלחת הרבה הודעות ברצף — נסו שוב בעוד דקה',
   'Post not found': 'ההודעה לא נמצאה (אולי נמחקה)',
   'Cannot vote for your own post': 'אי אפשר להצביע להודעה שלך',
+  'Question is required': 'כתבו שאלה',
+  'Question is too long': 'השאלה ארוכה מדי (עד 300 תווים)',
+  'A poll needs 2–6 options': 'סקר צריך 2–6 אפשרויות',
+  'Options cannot be empty': 'יש אפשרות ריקה',
+  'Options must be different': 'האפשרויות חייבות להיות שונות',
+  'Option is too long': 'אפשרות ארוכה מדי (עד 120 תווים)',
+  'Invalid correct answer': 'התשובה הנכונה לא תקינה',
+  'Attendance is not open': 'סקר "רק לנוכחים" אפשר לפתוח רק כשהנוכחות פתוחה',
+  'Only drafts can be edited': 'אפשר לערוך רק טיוטות',
+  'Poll not found': 'הסקר לא נמצא',
+  'Poll is closed': 'הסקר נסגר',
+  'Only students present in class can answer': 'הסקר פתוח רק למי שנכח/ה בשיעור',
+  'Choose one answer': 'בחרו תשובה אחת',
+  'Invalid answer': 'בחרו תשובה',
+  'Answer is too long': 'התשובה ארוכה מדי (עד 200 תווים)',
 };
 
 export class ApiError extends Error {
@@ -184,6 +199,7 @@ export interface CourseDashboard {
   atRisk: { email: string; firstName: string; lastName: string; attended: number; percent: number }[];
   atRiskThreshold: number;
   feed: { openQuestions: number; totalPosts: number };
+  polls: { open: { id: string; question: string } | null; total: number };
 }
 
 export interface SessionRosterRow {
@@ -263,3 +279,64 @@ export interface CourseFeed {
 }
 
 export const POST_MAX_LENGTH = 500;
+
+export type PollType = 'choice' | 'yesno' | 'scale' | 'text';
+
+export interface PollResults {
+  responses: number;
+  counts?: Record<string, number>;
+  scale?: { counts: number[]; average: number | null };
+  texts?: string[];
+}
+
+export interface PollAnswer {
+  optionIds?: string[];
+  value?: number;
+  text?: string;
+}
+
+interface PollBase {
+  id: string;
+  question: string;
+  type: PollType;
+  multiple: boolean;
+  options: { id: string; text: string }[];
+  audience: 'roster' | 'present';
+  status: 'draft' | 'open' | 'closed';
+  resultsRevealed: boolean;
+  openedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  correctOptionIds: string[];
+}
+
+export interface LecturerPoll extends PollBase {
+  showTextOnScreen: boolean;
+  results: PollResults;
+  /** How many students may answer. */
+  eligible: number;
+}
+
+export interface StudentPoll extends PollBase {
+  canAnswer: boolean;
+  eligible: boolean;
+  myAnswer: PollAnswer | null;
+  /** null until the lecturer reveals results. */
+  results: PollResults | null;
+}
+
+export interface CoursePolls<P> {
+  course: { id: string; name: string };
+  polls: P[];
+}
+
+/** What the poll editor sends: options as texts, correct as option indexes (or 'yes'/'no'). */
+export interface PollDraft {
+  question: string;
+  type: PollType;
+  multiple: boolean;
+  options: string[];
+  correct: (number | 'yes' | 'no')[];
+  audience: 'roster' | 'present';
+  showTextOnScreen: boolean;
+}

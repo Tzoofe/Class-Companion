@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
+import OpenPollBanner from './OpenPollBanner';
 
-/** Tabs on a student's course pages. */
-export default function StudentCourseTabs({ courseId, active }: { courseId: string; active: 'checkin' | 'feed' }) {
-  const tab = (key: typeof active, to: string, label: string) => (
+type Tab = 'checkin' | 'feed' | 'polls';
+
+/** Tabs on a student's course pages, plus a banner when a poll is waiting for an answer. */
+export default function StudentCourseTabs({ courseId, active }: { courseId: string; active: Tab }) {
+  const tab = (key: Tab, to: string, label: string) => (
     <Link
       to={to}
       aria-current={active === key ? 'page' : undefined}
@@ -12,9 +15,13 @@ export default function StudentCourseTabs({ courseId, active }: { courseId: stri
     </Link>
   );
   return (
-    <nav className="flex rounded-lg bg-slate-100 p-1">
-      {tab('checkin', `/courses/${courseId}/checkin`, 'נוכחות')}
-      {tab('feed', `/courses/${courseId}/feed`, 'שאלות והערות')}
-    </nav>
+    <div className="space-y-3">
+      <nav className="flex rounded-lg bg-slate-100 p-1">
+        {tab('checkin', `/courses/${courseId}/checkin`, 'נוכחות')}
+        {tab('feed', `/courses/${courseId}/feed`, 'שאלות והערות')}
+        {tab('polls', `/courses/${courseId}/polls`, 'סקרים')}
+      </nav>
+      {active !== 'polls' && <OpenPollBanner courseId={courseId} />}
+    </div>
   );
 }

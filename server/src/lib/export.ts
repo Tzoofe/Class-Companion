@@ -25,6 +25,16 @@ export interface ExportPost {
   reply: string;
 }
 
+export interface ExportPoll {
+  openedAt: Date | null;
+  question: string;
+  type: string;
+  /** One line per option / value, e.g. "כן: 12 ✓". */
+  summary: string;
+  responses: number;
+  answers: { email: string; answer: string; correct: boolean | null }[];
+}
+
 export interface ExportInput {
   courseName: string;
   roster: StatsInput['roster'];
@@ -33,6 +43,8 @@ export interface ExportInput {
   records: ExportRecord[];
   /** Course feed (questions & suggestions); its sheet is added only when there are posts. */
   posts?: ExportPost[];
+  /** Opened polls, oldest first; sheets are added only when there are polls. */
+  polls?: ExportPoll[];
   now: Date;
   timeZone: string;
 }
@@ -74,7 +86,7 @@ function styleSheet(ws: ExcelJS.Worksheet, headerRow: number) {
 }
 
 /** Summary sheet + one sheet per session (oldest first). */
-export function buildCourseWorkbook({ courseName, roster, users, sessions, records, posts = [], now, timeZone }: ExportInput): ExcelJS.Workbook {
+export function buildCourseWorkbook({ courseName, roster, users, sessions, records, posts = [], polls = [], now, timeZone }: ExportInput): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Class Companion';
   wb.created = now;
@@ -115,7 +127,7 @@ export function buildCourseWorkbook({ courseName, roster, users, sessions, recor
 
   // One sheet per session
   const byKey = new Map(records.map((r) => [`${r.sessionId}|${r.email.toLowerCase()}`, r]));
-  const taken = new Set(['סיכום', 'שאלות והערות']);
+  const taken = new Set(['סיכום', 'שאלות והערות', 'סקרים', 'תשובות לסקרים']);
   for (const session of ordered) {
     const ws = wb.addWorksheet(sessionSheetName(session.startsAt, timeZone, taken));
     const count = present.filter((r) => r.sessionId === session.id).length;
@@ -181,6 +193,39 @@ export function buildCourseWorkbook({ courseName, roster, users, sessions, recor
       row.getCell(9).alignment = { wrapText: true, vertical: 'top' };
     }
     styleSheet(ws, 4);
+  }
+
+  if (polls.length > 0) {
+    const nameByEmail = new Map(roster.map((r) => [r.email.toLowerCase(), r]));
+    const TYPE: Record<string, string> = { choice: 'בחירה', yesno: 'כן/לא', scale: 'סולם 1–5', text: 'טקסט חופשי' };
+
+    const ws = wb.addWorksheet('סקרים');
+    ws.addRow([courseName]).font = { bold: true, size: 14 };
+    ws.addRow([`${polls.length} סקרים`]);
+    ws.addRow([]);
+    ws.columns = [{ width: 16 }, { width: 50 }, { width: 12 }, { width: 10 }, { width: 50 }];
+    ws.addRow(['נפתח', 'שאלה', 'סוג', 'עונים', 'תוצאות']);
+    for (const p of polls) {
+      const row = ws.addRow([local(p.openedAt), p.question, TYPE[p.type] ?? p.type, p.responses, p.summary]);
+      row.getCell(1).numFmt = DATE_TIME;
+      row.getCell(2).alignment = { wrapText: true, vertical: 'top' };
+      row.getCell(5).alignment = { wrapText: true, vertical: 'top' };
+    }
+    styleSheet(ws, 4);
+
+    const answers = wb.addWorksheet('תשובות לסקרים');
+    answers.addRow([courseName]).font = { bold: true, size: 14 };
+    answers.addRow(['תשובה של כל סטודנט/ית בכל סקר']);
+    answers.addRow([]);
+    answers.columns = [{ width: 40 }, { width: 16 }, { width: 14 }, { width: 30 }, { width: 40 }, { width: 8 }];
+    answers.addRow(['שאלה', 'שם משפחה', 'שם פרטי', 'אימייל', 'תשובה', 'נכון']);
+    for (const p of polls) {
+      for (const a of p.answers) {
+        const r = nameByEmail.get(a.email.toLowerCase());
+        answers.addRow([p.question, r?.lastName ?? '', r?.firstName ?? '', a.email, a.answer, a.correct === null ? null : a.correct ? 'כן' : 'לא']);
+      }
+    }
+    styleSheet(answers, 4);
   }
   return wb;
 }

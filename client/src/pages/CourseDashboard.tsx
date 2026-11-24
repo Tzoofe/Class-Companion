@@ -259,6 +259,29 @@ export default function CourseDashboard() {
           </Link>
         </Card>
 
+        <Card
+          title="סקרים"
+          action={
+            <Link to={`/courses/${course.id}/polls/present`} className="text-sm text-indigo-700 hover:underline">
+              מסך הקרנה
+            </Link>
+          }
+        >
+          <Link to={`/courses/${course.id}/polls`} className="block rounded-lg p-1 hover:bg-slate-50">
+            {data.polls.open ? (
+              <>
+                <span className="text-xs font-medium text-emerald-700">● סקר פתוח</span>
+                <span className="mt-0.5 block truncate font-medium">{data.polls.open.question}</span>
+              </>
+            ) : (
+              <span className="block text-sm text-slate-600">אין סקר פתוח</span>
+            )}
+            <span className="mt-1 block text-xs text-slate-500">
+              {data.polls.total} סקרים בסך הכל · {data.polls.open ? 'לתוצאות ←' : 'סקר חדש ←'}
+            </span>
+          </Link>
+        </Card>
+
         <Card title="מטלות">
           <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
             <p className="font-medium text-slate-600">בקרוב</p>

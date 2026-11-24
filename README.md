@@ -4,7 +4,7 @@ A mobile-first web app for classroom attendance based on phone GPS proximity, wi
 
 > **Status:** early development. Available now: accounts (lecturer / student), course creation from a
 > roster file, a course dashboard (attendance per session, students who need attention, assignments placeholder),
-> a student list with per-student attendance, a questions & suggestions feed (anonymous option, votes, projector view), starting / closing an attendance session from
+> a student list with per-student attendance, a questions & suggestions feed (anonymous option, votes, projector view), live polls, starting / closing an attendance session from
 > the lecturer's phone, GPS check-in for students ("I'm here"), and the location-accuracy debug tool
 > (`/debug/location`).
 
@@ -95,6 +95,13 @@ Authenticated requests send `Authorization: Bearer <token>`.
 | POST | `/api/posts/:id/vote` | student | `{ up }` — one 👍 per student, not on your own post |
 | PATCH | `/api/posts/:id` | lecturer (own course) | `{ status?, pinned?, hidden?, reply? }`; a reply marks it answered; the author gets a push |
 | DELETE | `/api/posts/:id` | author / lecturer | delete a post |
+| GET | `/api/courses/:id/polls` | lecturer (own) / student (on roster) | lecturer: all polls with live results · student: opened polls, own answer, results only once revealed |
+| GET | `/api/courses/:id/polls/active` | course member | the open poll (`answered`, `canAnswer` for students) or `null` |
+| POST | `/api/courses/:id/polls` | lecturer | create `{ question, type: choice\|yesno\|scale\|text, multiple, options[], correct[], audience: roster\|present, showTextOnScreen, open? }` |
+| PUT | `/api/polls/:id` | lecturer | edit a draft |
+| POST | `/api/polls/:id/open` · `/close` · `/reveal` · `/duplicate` | lecturer | opening closes the course's other open poll and notifies eligible students |
+| DELETE | `/api/polls/:id` | lecturer | delete with its answers |
+| PUT | `/api/polls/:id/response` | eligible student | answer or change the answer while open |
 | GET | `/api/push/public-key` | public | VAPID public key for subscribing (`null` if push isn't configured) |
 | POST | `/api/push/subscribe` | any | save this device's push subscription (`PushSubscription.toJSON()`); endpoint must be a known push service |
 | POST | `/api/push/unsubscribe` | any | `{ endpoint }` — remove one of your own devices |
@@ -109,6 +116,17 @@ pins and hides them, and can open a full-screen **projector view** (`/courses/:i
 questions sorted by votes and a QR code to join. Posts written without a connection are kept on the phone
 and sent automatically when it reconnects (safe to retry: the server de-duplicates by `clientId`). The
 export adds a *שאלות והערות* sheet.
+
+## Polls
+
+The lecturer creates on-the-spot polls and chooses per poll: the **type** (multiple choice with one or
+several answers, yes/no, 1–5 scale, short text), an optional **correct answer**, and **who can answer**
+(everyone on the roster, or only students present in the open attendance session). Quick polls
+(*הבנתם?*, *קצב השיעור*) open with one tap; drafts can be prepared ahead and reused. Opening a poll notifies
+students and shows a banner on their course pages; they can change their answer until it closes. Students
+see results (and the correct answer) only when the lecturer reveals them; the projector view
+(`/courses/:id/polls/present`) shows live results and a QR code. The export adds *סקרים* and
+*תשובות לסקרים* sheets.
 
 ## Push notifications
 

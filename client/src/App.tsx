@@ -5,6 +5,7 @@ import RequireAuth from './components/RequireAuth';
 import AuthForm from './pages/AuthForm';
 import CourseDashboard from './pages/CourseDashboard';
 import CourseFeed from './pages/CourseFeed';
+import CoursePolls from './pages/CoursePolls';
 import CourseSessions from './pages/CourseSessions';
 import CourseStudents from './pages/CourseStudents';
 import Courses from './pages/Courses';
@@ -12,6 +13,7 @@ import LecturerAttendance from './pages/LecturerAttendance';
 import DebugLocation from './pages/DebugLocation';
 import FeedPresent from './pages/FeedPresent';
 import NewCourse from './pages/NewCourse';
+import PollPresent from './pages/PollPresent';
 import SessionDetail from './pages/SessionDetail';
 import StudentCheckIn from './pages/StudentCheckIn';
 
@@ -25,10 +27,12 @@ export default function App() {
         <Route element={<RequireAuth />}>
           <Route element={<RequireAuth role="lecturer" />}>
             <Route path="/courses/:id/feed/present" element={<FeedPresent />} />
+            <Route path="/courses/:id/polls/present" element={<PollPresent />} />
           </Route>
           <Route element={<Layout />}>
             <Route path="/courses" element={<Courses />} />
             <Route path="/courses/:id/feed" element={<CourseFeed />} />
+            <Route path="/courses/:id/polls" element={<CoursePolls />} />
             <Route element={<RequireAuth role="student" />}>
               <Route path="/courses/:id/checkin" element={<StudentCheckIn />} />
             </Route>

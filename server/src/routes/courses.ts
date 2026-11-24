@@ -12,6 +12,8 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { config } from '../config.js';
 import { Attendance, PRESENT } from '../models/Attendance.js';
 import { Post } from '../models/Post.js';
+import { exportPolls } from '../lib/pollExport.js';
+import { pollSummary } from './polls.js';
 import { countOpenQuestions } from './posts.js';
 import { Course } from '../models/Course.js';
 import { Session } from '../models/Session.js';
@@ -167,8 +169,12 @@ coursesRouter.get('/:id/dashboard', requireRole('lecturer'), async (req, res) =>
     attendance: attendance.map((a) => ({ sessionId: String(a.sessionId), email: a.email })),
     now: new Date(),
   });
-  const [openQuestions, totalPosts] = await Promise.all([countOpenQuestions(course._id), Post.countDocuments({ courseId: course._id, hidden: false })]);
-  res.json({ course: { id: course.id, name: course.name, defaultRadiusM: course.defaultRadiusM }, ...dashboard, feed: { openQuestions, totalPosts } });
+  const [openQuestions, totalPosts, polls] = await Promise.all([
+    countOpenQuestions(course._id),
+    Post.countDocuments({ courseId: course._id, hidden: false }),
+    pollSummary(course._id),
+  ]);
+  res.json({ course: { id: course.id, name: course.name, defaultRadiusM: course.defaultRadiusM }, ...dashboard, feed: { openQuestions, totalPosts }, polls });
 });
 
 /** All sessions of a course, newest first, with how many attended each. Lecturer-only. */
@@ -204,9 +210,10 @@ coursesRouter.get('/:id/export', requireRole('lecturer'), async (req, res) => {
     User.find({ email: { $in: course.roster.map((r) => r.email) } }, { email: 1 }),
     Session.find({ courseId: course._id }, { status: 1, startsAt: 1, endsAt: 1 }),
   ]);
-  const [records, posts] = await Promise.all([
+  const [records, posts, polls] = await Promise.all([
     Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) } }),
     Post.find({ courseId: course._id }).sort({ createdAt: 1 }).populate('authorId', 'email'),
+    exportPolls(course._id),
   ]);
   const now = new Date();
   const wb = buildCourseWorkbook({
@@ -236,6 +243,7 @@ coursesRouter.get('/:id/export', requireRole('lecturer'), async (req, res) => {
       duringClass: !!p.sessionId,
       reply: p.reply?.text ?? '',
     })),
+    polls,
     now,
     timeZone: config.timeZone,
   });
