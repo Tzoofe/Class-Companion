@@ -14,11 +14,23 @@ function readCredentials(body: unknown): { email: string; password: string } | n
   return { email: normalizeEmail(email), password };
 }
 
-/** Student self-signup. Name is taken from the first course roster that lists the email. */
+/** What the signup form needs to know (allowed email domains). */
+authRouter.get('/signup-config', (_req, res) => {
+  res.json({ domains: config.signupDomains });
+});
+
+/** Student self-signup: university email (config.signupDomains) or an email listed on a course roster. Name is taken from the first course roster that lists the email. */
 authRouter.post('/signup', async (req, res) => {
   const creds = readCredentials(req.body);
   if (!creds || !isEmail(creds.email)) {
     res.status(400).json({ error: 'Invalid email' });
+    return;
+  }
+  // University email, or any email a lecturer put on a course roster.
+  const domains = config.signupDomains;
+  const onRoster = await Course.exists({ 'roster.email': creds.email });
+  if (domains.length && !domains.includes(creds.email.split('@')[1]) && !onRoster) {
+    res.status(400).json({ error: 'Use your university email', domains });
     return;
   }
   if (creds.password.length < config.minPasswordLength) {

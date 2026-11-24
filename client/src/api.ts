@@ -22,6 +22,7 @@ export const tokenStore = {
 const HEBREW_ERRORS: Record<string, string> = {
   'Wrong email or password': 'אימייל או סיסמה שגויים',
   'Invalid email': 'כתובת אימייל לא תקינה',
+  'Use your university email': 'ההרשמה אפשרית עם המייל האוניברסיטאי (@msmail.ariel.ac.il) או עם המייל שמופיע ברשימת הקורס',
   'Email already registered': 'האימייל כבר רשום — נסו להתחבר',
   'Not logged in': 'יש להתחבר מחדש',
   Forbidden: 'אין הרשאה לפעולה זו',

@@ -24,6 +24,17 @@ export const config = {
   },
   /** Times in exported spreadsheets are shown in this time zone. */
   timeZone: process.env.TIME_ZONE || 'Asia/Jerusalem',
+  /**
+   * Students may sign up only with these email domains (comma-separated in SIGNUP_EMAIL_DOMAINS).
+   * Empty = any domain. Defaults to Ariel University student mail; tests default to any.
+   */
+  get signupDomains(): string[] {
+    const raw = process.env.SIGNUP_EMAIL_DOMAINS ?? (isTest ? '' : 'msmail.ariel.ac.il');
+    return raw
+      .split(',')
+      .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
+      .filter(Boolean);
+  },
   jwtExpiresIn: '7d',
   minPasswordLength: 6,
 };

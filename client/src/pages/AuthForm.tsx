@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { api } from '../api';
 import { useAuth } from '../auth';
 import { ErrorBox, Field, primaryButton } from '../components/ui';
 
@@ -12,8 +13,16 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [domains, setDomains] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (mode === 'signup') api<{ domains: string[] }>('/auth/signup-config').then((r) => setDomains(r.domains), () => {});
+  }, [mode]);
 
   if (user) return <Navigate to={from} replace />;
+
+  const domainOf = (e: string) => e.trim().toLowerCase().split('@')[1] ?? '';
+  const wrongDomain = mode === 'signup' && domains.length > 0 && email.includes('@') && domainOf(email) !== '' && !domains.includes(domainOf(email));
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -35,7 +44,21 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
       <h1 className="text-2xl font-bold text-indigo-700">Class Companion</h1>
       <p className="mb-6 mt-1 text-slate-600">{isLogin ? 'התחברות' : 'הרשמה לסטודנטים'}</p>
       <form onSubmit={onSubmit} className="space-y-4">
-        <Field label="אימייל" type="email" dir="ltr" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field
+          label={!isLogin && domains.length ? 'מייל אוניברסיטאי' : 'אימייל'}
+          type="email"
+          dir="ltr"
+          autoComplete="email"
+          required
+          placeholder={!isLogin && domains.length ? `name@${domains[0]}` : undefined}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        {wrongDomain && (
+          <p className="-mt-2 text-xs text-amber-700">
+            זה לא מייל אוניברסיטאי. ההרשמה תעבוד רק אם המרצה הוסיף/ה בדיוק את הכתובת הזו לרשימת הקורס.
+          </p>
+        )}
         <Field
           label="סיסמה"
           type="password"
@@ -46,7 +69,17 @@ export default function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        {!isLogin && <p className="text-xs text-slate-500">השתמשו באימייל שמופיע ברשימת הקורס. השם יילקח מהרשימה.</p>}
+        {!isLogin && (
+          <p className="text-xs text-slate-500">
+            {domains.length ? (
+              <>
+                הירשמו עם המייל האוניברסיטאי (<span dir="ltr">@{domains[0]}</span>), או עם המייל שהמרצה רשם/ה ברשימת הקורס — כך הקורסים שלכם יופיעו אוטומטית. השם יילקח מהרשימה.
+              </>
+            ) : (
+              'השתמשו באימייל שמופיע ברשימת הקורס. השם יילקח מהרשימה.'
+            )}
+          </p>
+        )}
         <ErrorBox>{error}</ErrorBox>
         <button type="submit" disabled={busy} className={primaryButton}>
           {busy ? '…' : isLogin ? 'התחברות' : 'הרשמה'}

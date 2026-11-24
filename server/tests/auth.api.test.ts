@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { Course } from '../src/models/Course';
 import { User } from '../src/models/User';
 import { api, createLecturer, loginToken, useTestDb } from './helpers';
@@ -71,5 +71,39 @@ describe('GET /api/auth/me', () => {
   it('rejects missing or forged tokens', async () => {
     expect((await api().get('/api/auth/me')).status).toBe(401);
     expect((await api().get('/api/auth/me').set('Authorization', 'Bearer abc.def.ghi')).status).toBe(401);
+  });
+});
+
+describe('signup email domain', () => {
+  const original = process.env.SIGNUP_EMAIL_DOMAINS;
+  afterEach(() => {
+    if (original === undefined) delete process.env.SIGNUP_EMAIL_DOMAINS;
+    else process.env.SIGNUP_EMAIL_DOMAINS = original;
+  });
+
+  it('accepts only the configured university domains (case-insensitive)', async () => {
+    process.env.SIGNUP_EMAIL_DOMAINS = 'msmail.ariel.ac.il, @ariel.ac.il';
+    const signup = (email: string) => api().post('/api/auth/signup').send({ email, password: 'secret123' });
+    const bad = await signup('dana@gmail.com');
+    expect(bad.status).toBe(400);
+    expect(bad.body).toEqual({ error: 'Use your university email', domains: ['msmail.ariel.ac.il', 'ariel.ac.il'] });
+    expect((await signup('dana@evil-msmail.ariel.ac.il.com')).status).toBe(400);
+    expect((await signup('Dana@MSMAIL.ariel.ac.il')).status).toBe(201);
+    expect((await signup('staff@ariel.ac.il')).status).toBe(201);
+    expect((await api().get('/api/auth/signup-config')).body).toEqual({ domains: ['msmail.ariel.ac.il', 'ariel.ac.il'] });
+  });
+
+  it('also allows a non-university email that a lecturer put on a course roster', async () => {
+    process.env.SIGNUP_EMAIL_DOMAINS = 'msmail.ariel.ac.il';
+    const lect = await createLecturer();
+    await Course.create({ name: 'C', lecturerId: lect._id, roster: [{ email: 'Guest@Gmail.com' }] });
+    const signup = (email: string) => api().post('/api/auth/signup').send({ email, password: 'secret123' });
+    expect((await signup('guest@gmail.com')).status).toBe(201);
+    expect((await signup('other@gmail.com')).status).toBe(400);
+  });
+
+  it('allows any domain when the setting is empty', async () => {
+    process.env.SIGNUP_EMAIL_DOMAINS = '';
+    expect((await api().post('/api/auth/signup').send({ email: 'x@gmail.com', password: 'secret123' })).status).toBe(201);
   });
 });

@@ -133,6 +133,8 @@ export adds a *שאלות והערות* sheet.
 - Each course has a **schedule** (weekly slots + optional semester dates) and **one-off events**; students get
   push notifications when upcoming items are added, changed or cancelled. Times are local (`TIME_ZONE`).
 - **Course settings:** rename, default radius, add/remove students, re-upload the roster (merge or replace).
+- **Student signup** requires a university email (`SIGNUP_EMAIL_DOMAINS`, default `msmail.ariel.ac.il`), or any
+  email the lecturer put on a course roster.
 
 ## Polls
 
