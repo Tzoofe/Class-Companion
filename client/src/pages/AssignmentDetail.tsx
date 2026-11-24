@@ -187,6 +187,35 @@ function Comparison({ final, open, dueAt, onRequested }: { final: SubmissionView
   );
 }
 
+/** Submit a reviewed draft as the final submission, without uploading it again. */
+function SubmitDraft({ draftId, replacing, onDone }: { draftId: string; replacing: boolean; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function submit() {
+    if (replacing && !window.confirm('הטיוטה הזו תחליף את ההגשה הקודמת. להמשיך?')) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/submissions/${draftId}/submit`, { method: 'POST' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="space-y-2 border-t border-line pt-4">
+      <button type="button" disabled={busy} onClick={submit} className={pillButton}>
+        {busy ? '…' : replacing ? 'הגשת הטיוטה הזו במקום ההגשה הקודמת' : 'הגשת הטיוטה הזו'}
+      </button>
+      <p className="text-xs text-ink-3">מגיש את אותו קובץ כהגשה הסופית, בלי להעלות שוב. המשוב עליו נשמר.</p>
+      <ErrorBox>{error}</ErrorBox>
+    </div>
+  );
+}
+
 function StudentView({ data, reload }: { data: StudentAssignmentDetail; reload: () => void }) {
   const a = data.assignment;
   const overdue = new Date(a.dueAt).getTime() < Date.now();
@@ -267,8 +296,9 @@ function StudentView({ data, reload }: { data: StudentAssignmentDetail; reload: 
             <summary className="cursor-pointer text-sm">
               {p.fileName}, {submittedText(p)}
             </summary>
-            <div className="mt-4">
+            <div className="mt-4 space-y-4">
               <ReviewPanel review={p.review} criteria={a.criteria} shares={data.classShares} />
+              {!reviewBusy(p.review) && <SubmitDraft draftId={p.id} replacing={!!final} onDone={reload} />}
             </div>
           </details>
         ))}

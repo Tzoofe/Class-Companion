@@ -144,6 +144,28 @@ describe('assignments', () => {
     expect((await submit(students[0], a.id, 'final', 'empty.pdf', Buffer.alloc(0))).body.error).toBe('The file is empty');
   });
 
+  it('submits a reviewed draft as the final submission, keeping its review', async () => {
+    const { students, create, submit, lect } = await setup(2);
+    const a = (await create({ dueAt: future(), publish: true })).body.assignment;
+    const draft = (await submit(students[0], a.id, 'practice', 'draft.pdf', makePdf('base case answer'))).body.submission;
+    await settleJobs();
+    const res = await api().post(`/api/submissions/${draft.id}/submit`).set(students[0]);
+    expect(res.status).toBe(201);
+    expect(res.body.submission).toMatchObject({ kind: 'final', fileName: 'draft.pdf', review: { status: 'done' } });
+    const mine = (await api().get(`/api/assignments/${a.id}`).set(students[0])).body;
+    expect(mine.final.id).toBe(res.body.submission.id);
+    expect(mine.practice).toHaveLength(1); // the draft stays in the draft history
+    const lecturer = (await api().get(`/api/assignments/${a.id}`).set(lect)).body;
+    expect(lecturer.submissions).toHaveLength(1);
+    expect((await api().get(`/api/submissions/${res.body.submission.id}/file`).set(lect)).status).toBe(200);
+    // Again: replaces the final rather than adding a second one
+    await api().post(`/api/submissions/${draft.id}/submit`).set(students[0]);
+    expect((await api().get(`/api/assignments/${a.id}`).set(lect)).body.submissions).toHaveLength(1);
+    // Not someone else's draft, and not a final
+    expect((await api().post(`/api/submissions/${draft.id}/submit`).set(students[1])).status).toBe(404);
+    expect((await api().post(`/api/submissions/${res.body.submission.id}/submit`).set(students[0])).status).toBe(404);
+  });
+
   it('accepts scanned PDFs: stored for the lecturer, AI review skipped, no practice review used', async () => {
     const { students, create, submit, lect } = await setup(1);
     const a = (await create({ dueAt: future(), publish: true, practiceLimit: 1 })).body.assignment;

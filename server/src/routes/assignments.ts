@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Request } from 'express';
 import { Router } from 'express';
@@ -590,6 +590,45 @@ assignmentsRouter.post('/assignments/:aid/submissions', requireAuth, requireRole
   s.storedPath = stored;
   await s.save();
   void enqueueReview(s.id);
+  res.status(201).json({ submission: submissionView(s, { lecturer: false, gradesReleased: false }) });
+});
+
+/**
+ * Student: submit a reviewed draft as the final submission (no re-upload). The draft's AI review
+ * carries over, since it's the same file; it replaces any earlier final, like a new upload does.
+ */
+assignmentsRouter.post('/submissions/:sid/submit', requireAuth, requireRole('student'), async (req, res) => {
+  const found = await findSubmission(String(req.params.sid), req.auth!);
+  if (!found || found.submission.kind !== 'practice') {
+    res.status(404).json({ error: 'Submission not found' });
+    return;
+  }
+  const { submission: draft, assignment: a } = found;
+  if (!draft.storedPath) {
+    res.status(404).json({ error: 'Submission not found' });
+    return;
+  }
+  const now = new Date();
+  let s = await Submission.findOne({ assignmentId: a._id, email: draft.email, kind: 'final' });
+  if (s?.storedPath) await rm(s.storedPath, { force: true });
+  if (!s) s = new Submission({ assignmentId: a._id, courseId: a.courseId, email: draft.email, studentId: draft.studentId, kind: 'final' });
+  const review = draft.toObject().review;
+  const reviewed = review?.status === 'done' || review?.status === 'skipped';
+  s.set({
+    fileName: draft.fileName,
+    fileSize: draft.fileSize,
+    files: draft.toObject().files,
+    submittedAt: now,
+    lateMs: Math.max(0, now.getTime() - a.dueAt.getTime()),
+    review: reviewed ? review : { status: 'queued', error: '', summary: '', strengths: [], improvements: [], criteria: [], model: '' },
+    grade: undefined,
+    comparison: undefined,
+  });
+  const stored = path.join(config.submissionsDir, `${s.id}${path.extname(draft.storedPath)}`);
+  await copyFile(draft.storedPath, stored);
+  s.storedPath = stored;
+  await s.save();
+  if (!reviewed) void enqueueReview(s.id);
   res.status(201).json({ submission: submissionView(s, { lecturer: false, gradesReleased: false }) });
 });
 
