@@ -35,6 +35,21 @@ export interface ExportPoll {
   answers: { email: string; answer: string; correct: boolean | null }[];
 }
 
+export interface ExportAssignment {
+  title: string;
+  maxPoints: number;
+  /** email → submission (final only). */
+  submissions: Map<string, { lateMs: number; grade: number | null }>;
+}
+
+/** "3 שעות", "2 ימים" — how late, in words. */
+export function lateText(ms: number): string {
+  const h = ms / 3600_000;
+  if (h < 1) return `${Math.max(1, Math.round(ms / 60_000))} דק׳`;
+  if (h < 48) return `${Math.round(h)} שעות`;
+  return `${Math.round(h / 24)} ימים`;
+}
+
 export interface ExportInput {
   courseName: string;
   roster: StatsInput['roster'];
@@ -45,6 +60,8 @@ export interface ExportInput {
   posts?: ExportPost[];
   /** Opened polls, oldest first; sheets are added only when there are polls. */
   polls?: ExportPoll[];
+  /** Published assignments, by due date; a grades sheet is added when there are any. */
+  assignments?: ExportAssignment[];
   now: Date;
   timeZone: string;
 }
@@ -86,7 +103,7 @@ function styleSheet(ws: ExcelJS.Worksheet, headerRow: number) {
 }
 
 /** Summary sheet + one sheet per session (oldest first). */
-export function buildCourseWorkbook({ courseName, roster, users, sessions, records, posts = [], polls = [], now, timeZone }: ExportInput): ExcelJS.Workbook {
+export function buildCourseWorkbook({ courseName, roster, users, sessions, records, posts = [], polls = [], assignments = [], now, timeZone }: ExportInput): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Class Companion';
   wb.created = now;
@@ -125,9 +142,31 @@ export function buildCourseWorkbook({ courseName, roster, users, sessions, recor
   }
   styleSheet(summary, 4);
 
+  if (assignments.length > 0) {
+    const ws = wb.addWorksheet('ציונים');
+    ws.addRow([courseName]).font = { bold: true, size: 14 };
+    ws.addRow([`${assignments.length} מטלות`]);
+    ws.addRow([]);
+    ws.columns = [{ width: 16 }, { width: 14 }, { width: 30 }, ...assignments.flatMap(() => [{ width: 12 }, { width: 16 }])];
+    ws.addRow(['שם משפחה', 'שם פרטי', 'אימייל', ...assignments.flatMap((a) => [`${a.title} (מתוך ${a.maxPoints})`, 'הגשה'])]);
+    for (const s of rows) {
+      ws.addRow([
+        s.lastName,
+        s.firstName,
+        s.email,
+        ...assignments.flatMap((a) => {
+          const sub = a.submissions.get(s.email.toLowerCase());
+          if (!sub) return [null, 'לא הוגש'];
+          return [sub.grade, sub.lateMs > 0 ? `איחור ${lateText(sub.lateMs)}` : 'בזמן'];
+        }),
+      ]);
+    }
+    styleSheet(ws, 4);
+  }
+
   // One sheet per session
   const byKey = new Map(records.map((r) => [`${r.sessionId}|${r.email.toLowerCase()}`, r]));
-  const taken = new Set(['סיכום', 'שאלות והערות', 'סקרים', 'תשובות לסקרים']);
+  const taken = new Set(['סיכום', 'ציונים', 'שאלות והערות', 'סקרים', 'תשובות לסקרים']);
   for (const session of ordered) {
     const ws = wb.addWorksheet(sessionSheetName(session.startsAt, timeZone, taken));
     const count = present.filter((r) => r.sessionId === session.id).length;

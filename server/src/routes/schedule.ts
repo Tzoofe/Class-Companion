@@ -7,6 +7,7 @@ import { buildAgenda, describeEvent, readEvent, readSlots, type Slot } from '../
 import { addDays, isDate, localNow } from '../lib/time.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Course } from '../models/Course.js';
+import { Assignment } from '../models/Assignment.js';
 import { CourseEvent, type CourseEventDoc } from '../models/CourseEvent.js';
 import { User } from '../models/User.js';
 
@@ -51,7 +52,17 @@ scheduleRouter.get('/me/agenda', requireAuth, async (req, res) => {
     from,
     days,
   );
-  res.json({ now, from, days, items, hasSchedule: courses.some((c) => c.schedule.length > 0) });
+  // Assignment due dates (published ones) appear in the agenda too.
+  const to = addDays(from, days - 1);
+  const assignments = await Assignment.find({ courseId: { $in: courses.map((c) => c._id) }, status: 'published' }, { courseId: 1, title: 1, dueAt: 1 });
+  const courseName = new Map(courses.map((c) => [String(c._id), c.name]));
+  for (const a of assignments) {
+    const due = localNow(a.dueAt, config.timeZone);
+    if (due.date < from || due.date > to) continue;
+    items.push({ date: due.date, start: due.time, end: null, courseId: String(a.courseId), courseName: courseName.get(String(a.courseId)) ?? '', kind: 'due', title: a.title, place: '', link: '', notes: '', cancelled: false, eventId: a.id as string });
+  }
+  items.sort((x, y) => x.date.localeCompare(y.date) || x.start.localeCompare(y.start));
+  res.json({ now, from, days, items, hasSchedule: courses.some((c) => c.schedule.length > 0) || assignments.length > 0 });
 });
 
 /** A course's weekly slots and upcoming events (course members). */

@@ -3,6 +3,7 @@ import { Course } from '../../models/Course.js';
 import { LessonSummary } from '../../models/LessonSummary.js';
 import { Poll, PollResponse } from '../../models/Poll.js';
 import { Post } from '../../models/Post.js';
+import { enqueueJob, settleJobs } from '../jobs.js';
 import { aggregate } from '../polls.js';
 import { pollHeadline } from '../recap.js';
 import { ollamaClient, type LlmClient } from './llm.js';
@@ -62,14 +63,9 @@ async function process(id: string) {
   }
 }
 
-// One job at a time: transcription and the local model each use most of the machine.
-let chain: Promise<void> = Promise.resolve();
-export function enqueueSummary(id: string) {
-  chain = chain.then(() => process(id)).catch((e) => console.error('summary job failed', e));
-  return chain;
-}
+export const enqueueSummary = (id: string) => enqueueJob('summary', () => process(id));
 /** Resolves when all queued jobs finished (tests). */
-export const settleSummaries = () => chain;
+export const settleSummaries = settleJobs;
 
 /** On startup: jobs cut off by a restart are queued again. */
 export async function resumeSummaryJobs() {

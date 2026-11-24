@@ -79,6 +79,22 @@ const HEBREW_ERRORS: Record<string, string> = {
   'Event not found': 'האירוע לא נמצא',
   'Student already on roster': 'הסטודנט/ית כבר ברשימה',
   'Invalid setting': 'הגדרה לא תקינה',
+  'Upload a PDF or ZIP file': 'אפשר להגיש קובץ PDF או ZIP',
+  'No readable text in the PDF (is it scanned?)': 'לא נמצא טקסט ב-PDF. אם הוא סרוק, הגישו גרסה שנוצרה מהמחשב',
+  'No readable files in the ZIP': 'לא נמצאו קבצי קוד או טקסט ב-ZIP',
+  'Could not read the PDF': 'לא ניתן לקרוא את קובץ ה-PDF',
+  'Could not open the ZIP file': 'לא ניתן לפתוח את קובץ ה-ZIP',
+  'The ZIP has too many files': 'יש יותר מדי קבצים ב-ZIP',
+  'The ZIP is too large when unpacked': 'ה-ZIP גדול מדי אחרי פריסה',
+  'No practice reviews left': 'נוצלו כל בדיקות הטיוטה למטלה הזו',
+  'Assignment not found': 'המטלה לא נמצאה',
+  'Submission not found': 'ההגשה לא נמצאה',
+  'Invalid due date': 'מועד הגשה לא תקין',
+  'Invalid criteria': 'יש קריטריון לא תקין (כותרת חובה, ניקוד 0–1000)',
+  'Invalid max points': 'ניקוד מקסימלי לא תקין',
+  'Invalid grade': 'הציון לא תקין',
+  'Not enough reviewed submissions yet': 'צריך לפחות 2 הגשות שנבדקו',
+  'Instructions are too long': 'ההוראות ארוכות מדי',
   'Unsupported file type': 'סוג קובץ לא נתמך. אפשר להעלות הקלטה (mp4, m4a, mp3, wav, webm, mov) או תמלול (vtt, srt, txt)',
   'The transcript is empty': 'התמלול ריק',
   'The file is empty': 'הקובץ ריק',
@@ -225,6 +241,7 @@ export interface CourseDashboard {
   attendanceRequired: boolean;
   feed: { openQuestions: number; totalPosts: number };
   polls: { open: { id: string; question: string } | null; total: number };
+  assignments: { total: number; open: number; toGrade: number };
 }
 
 export interface SessionRosterRow {
@@ -434,7 +451,7 @@ export interface AgendaItem {
   end: string | null;
   courseId: string;
   courseName: string;
-  kind: 'class' | Exclude<EventKind, 'cancelled'>;
+  kind: 'class' | 'due' | Exclude<EventKind, 'cancelled'>;
   title: string;
   place: string;
   link: string;
@@ -479,6 +496,7 @@ export interface LecturerOverview {
   attention: {
     questions: { courseId: string; courseName: string; postId: string; text: string; votes: number; createdAt: string }[];
     atRisk: { courseId: string; courseName: string; count: number }[];
+    toGrade: { courseId: string; courseName: string; assignmentId: string; title: string; count: number }[];
   };
   courses: {
     id: string;
@@ -555,4 +573,87 @@ export function uploadFile<T>(path: string, file: File, onProgress: (fraction: n
     };
     xhr.send(file);
   });
+}
+
+// ── Assignments ──
+
+export interface Criterion {
+  id: string;
+  title: string;
+  description: string;
+  points: number;
+}
+
+export interface AssignmentBase {
+  id: string;
+  courseId: string;
+  title: string;
+  instructions: string;
+  dueAt: string;
+  maxPoints: number;
+  criteria: Criterion[];
+  practiceLimit: number;
+  status: 'draft' | 'published';
+  gradesReleased: boolean;
+}
+
+export type Met = 'yes' | 'partial' | 'no' | 'unknown';
+
+export interface ReviewView {
+  status: 'queued' | 'running' | 'done' | 'failed';
+  error: string;
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+  criteria: { criterionId: string; met: Met; feedback: string; suggestion: string; points?: number }[];
+  reviewedAt: string | null;
+}
+
+export interface SubmissionView {
+  id: string;
+  kind: 'final' | 'practice';
+  email?: string;
+  name?: string;
+  fileName: string;
+  fileSize: number;
+  files: { path: string; chars: number; code: boolean }[];
+  submittedAt: string;
+  lateMs: number;
+  review: ReviewView;
+  suggestedPoints?: number | null;
+  grade: { points: number; criteria: { criterionId: string; points: number }[]; comment: string; gradedAt: string } | null;
+  practiceUsed?: number;
+}
+
+export interface LecturerAssignmentListItem extends AssignmentBase {
+  counts: { roster: number; submitted: number; late: number; reviewed: number; graded: number };
+}
+export interface StudentAssignmentListItem extends AssignmentBase {
+  mine: { submittedAt: string; lateMs: number; reviewStatus: string; grade: number | null } | null;
+}
+
+export interface LecturerAssignmentDetail {
+  course: { id: string; name: string };
+  assignment: AssignmentBase & { classOverview: { summary: string; commonIssues: string[]; strengths: string[]; generatedAt: string; basedOn: number } | null };
+  submissions: SubmissionView[];
+  missing: { email: string; name: string }[];
+}
+
+export interface StudentAssignmentDetail {
+  course: { id: string; name: string };
+  assignment: AssignmentBase;
+  final: SubmissionView | null;
+  practice: SubmissionView[];
+  practiceLeft: number;
+  classShares: Record<string, number> | null;
+}
+
+export const reviewBusy = (r: { status: string }) => r.status === 'queued' || r.status === 'running';
+
+/** "3 שעות", "2 ימים": how late, in words. */
+export function lateText(ms: number): string {
+  const h = ms / 3600_000;
+  if (h < 1) return `${Math.max(1, Math.round(ms / 60_000))} דק׳`;
+  if (h < 48) return `${Math.round(h)} שעות`;
+  return `${Math.round(h / 24)} ימים`;
 }

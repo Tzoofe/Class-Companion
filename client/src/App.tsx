@@ -4,6 +4,8 @@ import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
 import AuthForm from './pages/AuthForm';
 import CourseDashboard from './pages/CourseDashboard';
+import AssignmentDetail from './pages/AssignmentDetail';
+import CourseAssignments from './pages/CourseAssignments';
 import CourseFeed from './pages/CourseFeed';
 import CoursePolls from './pages/CoursePolls';
 import CourseSchedulePage from './pages/CourseSchedulePage';
@@ -19,6 +21,7 @@ import NewCourse from './pages/NewCourse';
 import PollPresent from './pages/PollPresent';
 import SessionDetail from './pages/SessionDetail';
 import SummaryDetail from './pages/SummaryDetail';
+import SubmissionDetail, { CompareSubmissions } from './pages/SubmissionDetail';
 import StudentCheckIn from './pages/StudentCheckIn';
 
 export default function App() {
@@ -39,6 +42,8 @@ export default function App() {
             <Route path="/courses/:id/polls" element={<CoursePolls />} />
             <Route path="/courses/:id/summaries" element={<CourseSummaries />} />
             <Route path="/courses/:id/summaries/:summaryId" element={<SummaryDetail />} />
+            <Route path="/courses/:id/assignments" element={<CourseAssignments />} />
+            <Route path="/courses/:id/assignments/:aid" element={<AssignmentDetail />} />
             <Route element={<RequireAuth role="student" />}>
               <Route path="/courses/:id/checkin" element={<StudentCheckIn />} />
             </Route>
@@ -49,6 +54,8 @@ export default function App() {
               <Route path="/courses/:id/sessions" element={<CourseSessions />} />
               <Route path="/courses/:id/settings" element={<CourseSettings />} />
               <Route path="/courses/:id/schedule" element={<CourseSchedulePage />} />
+              <Route path="/courses/:id/assignments/:aid/submissions/:sid" element={<SubmissionDetail />} />
+              <Route path="/courses/:id/assignments/:aid/compare" element={<CompareSubmissions />} />
               <Route path="/courses/:id/sessions/:sessionId" element={<SessionDetail />} />
               <Route path="/courses/:id/attendance" element={<LecturerAttendance />} />
             </Route>

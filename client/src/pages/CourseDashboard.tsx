@@ -161,6 +161,7 @@ export default function CourseDashboard() {
                 <Link to={`/courses/${course.id}/feed`} className={menuLink}>שאלות והערות</Link>
                 <Link to={`/courses/${course.id}/polls`} className={menuLink}>סקרים</Link>
                 <Link to={`/courses/${course.id}/summaries`} className={menuLink}>סיכומי שיעורים</Link>
+                <Link to={`/courses/${course.id}/assignments`} className={menuLink}>מטלות</Link>
                 <Link to={`/courses/${course.id}/feed/present`} className={menuLink}>מסך הקרנה: שאלות</Link>
                 <Link to={`/courses/${course.id}/polls/present`} className={menuLink}>מסך הקרנה: סקר</Link>
                 <Link to={`/courses/${course.id}/settings`} className={menuLink}>הגדרות הקורס</Link>
@@ -257,6 +258,17 @@ export default function CourseDashboard() {
                 <span className="block truncate text-ink-3">{poll ? poll.question : `${data.polls.total} סקרים עד עכשיו`}</span>
               </span>
               <TextLink to={`/courses/${course.id}/polls`}>{poll ? 'לתוצאות' : 'לסקרים'}</TextLink>
+            </li>
+            <li className="flex items-center justify-between gap-3 py-2.5 text-sm">
+              <span>
+                <span className="block">מטלות</span>
+                <span className="block text-ink-3">
+                  {data.assignments.total === 0
+                    ? 'עוד אין מטלות'
+                    : `${data.assignments.open} פתוחות להגשה${data.assignments.toGrade ? `, ${data.assignments.toGrade} הגשות ממתינות לציון` : ''}`}
+                </span>
+              </span>
+              <TextLink to={`/courses/${course.id}/assignments`}>{data.assignments.total === 0 ? 'מטלה חדשה' : 'למטלות'}</TextLink>
             </li>
             <li className="flex items-center justify-between gap-3 py-2.5 text-sm">
               <span>

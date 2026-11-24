@@ -1,15 +1,15 @@
 import { config } from '../../config.js';
 
 /** Asks a language model for JSON matching `schema`. Swappable (tests use a fake). */
-export type LlmClient = (req: { system: string; user: string; schema: object }) => Promise<unknown>;
+export type LlmClient = (req: { system: string; user: string; schema: object; model?: string }) => Promise<unknown>;
 
 /** Local model through Ollama (runs on this Mac, no internet needed). */
-export const ollamaClient: LlmClient = async ({ system, user, schema }) => {
+export const ollamaClient: LlmClient = async ({ system, user, schema, model }) => {
   const res = await fetch(`${config.ollama.url}/api/chat`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      model: config.ollama.model,
+      model: model ?? config.ollama.model,
       stream: false,
       format: schema, // Ollama constrains the output to this JSON schema
       options: { temperature: 0.2, num_ctx: config.ollama.contextTokens },

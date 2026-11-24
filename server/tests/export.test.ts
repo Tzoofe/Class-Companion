@@ -61,6 +61,17 @@ describe('buildCourseWorkbook', () => {
     expect(ws.getRow(6).getCell(8).value).toEqual(new Date('2026-11-17T10:03:00Z')); // local wall clock
   });
 
+  it('adds a grades sheet with late submissions and missing ones', () => {
+    const wb = buildCourseWorkbook({
+      ...input,
+      assignments: [{ title: 'רקורסיה', maxPoints: 100, submissions: new Map([['dana@x.com', { lateMs: 3 * 3600_000, grade: 90 }]]) }],
+    });
+    const ws = wb.getWorksheet('ציונים')!;
+    expect((ws.getRow(4).values as unknown[]).slice(1)).toEqual(['שם משפחה', 'שם פרטי', 'אימייל', 'רקורסיה (מתוך 100)', 'הגשה']);
+    expect((ws.getRow(5).values as unknown[]).slice(1)).toEqual(['אלון', 'אורי', 'late@x.com', undefined, 'לא הוגש']);
+    expect((ws.getRow(6).values as unknown[]).slice(1)).toEqual(['כהן', 'דנה', 'dana@x.com', 90, 'איחור 3 שעות']);
+  });
+
   it('adds a questions & comments sheet with real names, only when there are posts', () => {
     expect(buildCourseWorkbook(input).getWorksheet('שאלות והערות')).toBeUndefined();
     const wb = buildCourseWorkbook({

@@ -5,6 +5,7 @@ import { IconPin } from './icons';
 
 export const KIND_HE: Record<AgendaItem['kind'], string> = {
   class: 'שיעור',
+  due: 'הגשת מטלה',
   extra: 'שיעור נוסף',
   office: 'שעות קבלה',
   meeting: 'פגישה',

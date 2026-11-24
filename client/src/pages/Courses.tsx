@@ -255,9 +255,9 @@ function LecturerHome() {
   const liveCourses = new Set(overview.live.sessions.map((s) => s.courseId));
   const todayItems = agenda?.items.filter((i) => i.date === agenda.now.date) ?? [];
   const laterItems = agenda?.items.filter((i) => i.date > agenda.now.date && !i.cancelled) ?? [];
-  const { questions, atRisk } = overview.attention;
+  const { questions, atRisk, toGrade } = overview.attention;
   const polls = overview.live.polls;
-  const nothingToDo = !questions.length && !atRisk.length && !polls.length;
+  const nothingToDo = !questions.length && !atRisk.length && !polls.length && !toGrade.length;
 
   return (
     <div className="space-y-6">
@@ -304,6 +304,9 @@ function LecturerHome() {
               ))}
               {polls.map((p) => (
                 <ActionRow key={p.pollId} to={`/courses/${p.courseId}/polls`} title={p.question} detail={`סקר פתוח ב${p.courseName}, ${p.responses} ענו`} />
+              ))}
+              {toGrade.map((t) => (
+                <ActionRow key={t.assignmentId} to={`/courses/${t.courseId}/assignments/${t.assignmentId}`} title={`${t.count} הגשות ממתינות לציון`} detail={`${t.title}, ${t.courseName}`} />
               ))}
               {atRisk.map((r) => (
                 <ActionRow key={r.courseId} to={`/courses/${r.courseId}/students`} title={`${r.count} סטודנטים מתחת ל-70% נוכחות`} detail={r.courseName} warn />

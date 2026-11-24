@@ -12,6 +12,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { config } from '../config.js';
 import { Attendance, PRESENT } from '../models/Attendance.js';
 import { Post } from '../models/Post.js';
+import { Assignment, Submission } from '../models/Assignment.js';
 import { exportPolls } from '../lib/pollExport.js';
 import { pollSummary } from './polls.js';
 import { countOpenQuestions } from './posts.js';
@@ -320,7 +321,16 @@ coursesRouter.get('/:id/dashboard', requireRole('lecturer'), async (req, res) =>
     Post.countDocuments({ courseId: course._id, hidden: false }),
     pollSummary(course._id),
   ]);
-  res.json({ course: { id: course.id, name: course.name, defaultRadiusM: course.defaultRadiusM }, ...dashboard, feed: { openQuestions, totalPosts }, polls });
+  const assignments = await Assignment.find({ courseId: course._id }, { status: 1, dueAt: 1 });
+  const toGrade = await Submission.countDocuments({ assignmentId: { $in: assignments.map((a) => a._id) }, kind: 'final', grade: { $exists: false } });
+  const nowMs = Date.now();
+  res.json({
+    course: { id: course.id, name: course.name, defaultRadiusM: course.defaultRadiusM },
+    ...dashboard,
+    feed: { openQuestions, totalPosts },
+    polls,
+    assignments: { total: assignments.length, open: assignments.filter((a) => a.status === 'published' && a.dueAt.getTime() > nowMs).length, toGrade },
+  });
 });
 
 /** All sessions of a course, newest first, with how many attended each. Lecturer-only. */
@@ -361,6 +371,8 @@ coursesRouter.get('/:id/export', requireRole('lecturer'), async (req, res) => {
     Post.find({ courseId: course._id }).sort({ createdAt: 1 }).populate('authorId', 'email'),
     exportPolls(course._id),
   ]);
+  const assignmentDocs = await Assignment.find({ courseId: course._id, status: 'published' }).sort({ dueAt: 1 });
+  const finals = await Submission.find({ assignmentId: { $in: assignmentDocs.map((a) => a._id) }, kind: 'final' }, { assignmentId: 1, email: 1, lateMs: 1, grade: 1 });
   const now = new Date();
   const wb = buildCourseWorkbook({
     courseName: course.name,
@@ -390,6 +402,13 @@ coursesRouter.get('/:id/export', requireRole('lecturer'), async (req, res) => {
       reply: p.reply?.text ?? '',
     })),
     polls,
+    assignments: assignmentDocs.map((a) => ({
+      title: a.title,
+      maxPoints: a.maxPoints,
+      submissions: new Map(
+        finals.filter((s) => String(s.assignmentId) === String(a._id)).map((s) => [s.email, { lateMs: s.lateMs, grade: s.grade?.points ?? null }]),
+      ),
+    })),
     now,
     timeZone: config.timeZone,
   });

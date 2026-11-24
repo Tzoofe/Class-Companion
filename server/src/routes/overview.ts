@@ -3,6 +3,7 @@ import { lastLessonRecap } from '../lib/recap.js';
 import { closeExpiredSessions } from '../lib/sessions.js';
 import { buildDashboard, isSessionActive } from '../lib/stats.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { Assignment, Submission } from '../models/Assignment.js';
 import { Attendance, PRESENT } from '../models/Attendance.js';
 import { Course } from '../models/Course.js';
 import { Poll, PollResponse } from '../models/Poll.js';
@@ -80,6 +81,12 @@ overviewRouter.get('/me/overview', requireAuth, requireRole('lecturer'), async (
   });
 
   const recap = liveSessions.length ? null : await lastLessonRecap(courses, sessions, now);
+  const assignments = await Assignment.find({ courseId: { $in: courseIds }, status: 'published' }, { courseId: 1, title: 1 });
+  const ungraded = await Submission.aggregate<{ _id: unknown; n: number }>([
+    { $match: { assignmentId: { $in: assignments.map((a) => a._id) }, kind: 'final', grade: { $exists: false } } },
+    { $group: { _id: '$assignmentId', n: { $sum: 1 } } },
+  ]);
+  const ungradedBy = new Map(ungraded.map((u) => [String(u._id), u.n]));
 
   res.json({
     recap,
@@ -99,6 +106,9 @@ overviewRouter.get('/me/overview', requireAuth, requireRole('lecturer'), async (
         .sort((a, b) => b.votes - a.votes || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 5),
       atRisk: courseCards.filter((c) => c.atRiskCount > 0).map((c) => ({ courseId: c.id, courseName: c.name, count: c.atRiskCount })),
+      toGrade: assignments
+        .filter((a) => ungradedBy.get(a.id as string))
+        .map((a) => ({ courseId: String(a.courseId), courseName: name.get(String(a.courseId)) ?? '', assignmentId: a.id as string, title: a.title, count: ungradedBy.get(a.id as string)! })),
     },
     courses: courseCards,
   });

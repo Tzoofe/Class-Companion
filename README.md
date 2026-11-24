@@ -137,6 +137,23 @@ One-time setup (macOS): `brew install ffmpeg whisper-cpp ollama && brew services
 `~/.cache/class-companion/whisper/`. Settings: `OLLAMA_MODEL`, `OLLAMA_URL`, `WHISPER_MODEL`, `MEDIA_DIR`,
 `MAX_UPLOAD_MB` in `server/.env`.
 
+## Assignments & AI homework review (local AI)
+
+- The lecturer creates assignments (instructions, due date, review criteria with points, practice-review limit) and
+  publishes them; due dates appear in the agenda.
+- Students submit a **PDF or ZIP** (code projects: text/code files and PDFs inside are read; junk folders,
+  binaries and hidden files skipped; size and file-count limits). Late submissions are accepted and marked
+  with how late they were. Resubmitting replaces the previous final submission.
+- **Practice reviews:** before submitting, a student can upload drafts for private AI feedback (limited per
+  assignment); the lecturer doesn't see drafts.
+- **AI review** (the local model through Ollama, `OLLAMA_MODEL` / `OLLAMA_CODE_MODEL`): per criterion met /
+  partial / missing with feedback and a suggestion, strengths and improvements. Suggested points come from the
+  verdict (full / half / zero), not from the model. Students also see how the class did on each criterion once
+  at least 5 classmates were reviewed (anonymous aggregates only).
+- **Lecturer:** grading prefilled with the suggestion, comment, original file download, release grades
+  (students notified), class overview of common mistakes, and **similar submissions** (shared 5-word
+  sequences, works across renamed files) with a side-by-side view. Grades are in the export (*ציונים* sheet).
+
 ## Home pages & schedule
 
 - **Lecturer home:** what's live now (open attendance / polls), **today** from the schedule (with a one-tap

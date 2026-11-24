@@ -39,6 +39,8 @@ export const config = {
   ollama: {
     url: process.env.OLLAMA_URL || 'http://127.0.0.1:11434',
     model: process.env.OLLAMA_MODEL || 'aya-expanse:8b',
+    /** Reviews of code submissions. */
+    codeModel: process.env.OLLAMA_CODE_MODEL || process.env.OLLAMA_MODEL || 'aya-expanse:8b',
     contextTokens: Number(process.env.OLLAMA_CONTEXT || 8192),
   },
   whisper: {
@@ -50,6 +52,9 @@ export const config = {
   /** Where uploaded/downloaded recordings wait for transcription (deleted afterwards). */
   get mediaDir() {
     return process.env.MEDIA_DIR || `${process.env.HOME}/.cache/class-companion/media`;
+  },
+  get submissionsDir() {
+    return process.env.SUBMISSIONS_DIR || `${process.env.HOME}/.cache/class-companion/submissions`;
   },
   get maxUploadMb() {
     return Number(process.env.MAX_UPLOAD_MB || 2048);

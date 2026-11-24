@@ -1,26 +1,33 @@
 import { Link } from 'react-router-dom';
 import OpenPollBanner from './OpenPollBanner';
 
-type Tab = 'checkin' | 'feed' | 'polls' | 'summaries';
+type Tab = 'checkin' | 'feed' | 'polls' | 'assignments' | 'summaries';
 
-/** Tabs on a student's course pages, plus a banner when a poll is waiting for an answer. */
+const TABS: [Tab, string, string][] = [
+  ['checkin', 'checkin', 'נוכחות'],
+  ['feed', 'feed', 'שאלות'],
+  ['polls', 'polls', 'סקרים'],
+  ['assignments', 'assignments', 'מטלות'],
+  ['summaries', 'summaries', 'סיכומים'],
+];
+
+/** Tabs on a student's course pages (scroll sideways on narrow phones), plus the open-poll banner. */
 export default function StudentCourseTabs({ courseId, active }: { courseId: string; active: Tab }) {
-  const tab = (key: Tab, to: string, label: string) => (
-    <Link
-      to={to}
-      aria-current={active === key ? 'page' : undefined}
-      className={`flex-1 rounded-md px-3 py-2 text-center text-sm ${active === key ? 'bg-surface-2 font-medium ' : 'text-ink-2'}`}
-    >
-      {label}
-    </Link>
-  );
   return (
     <div className="space-y-3">
-      <nav className="flex rounded-xl bg-surface-2 p-1">
-        {tab('checkin', `/courses/${courseId}/checkin`, 'נוכחות')}
-        {tab('feed', `/courses/${courseId}/feed`, 'שאלות')}
-        {tab('polls', `/courses/${courseId}/polls`, 'סקרים')}
-        {tab('summaries', `/courses/${courseId}/summaries`, 'סיכומים')}
+      <nav className="flex gap-1 overflow-x-auto rounded-xl bg-surface-2 p-1">
+        {TABS.map(([key, path, label]) => (
+          <Link
+            key={key}
+            to={`/courses/${courseId}/${path}`}
+            aria-current={active === key ? 'page' : undefined}
+            className={`flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-center text-sm transition-colors ${
+              active === key ? 'bg-surface font-medium text-ink shadow-sm' : 'text-ink-3 hover:text-ink'
+            }`}
+          >
+            {label}
+          </Link>
+        ))}
       </nav>
       {active !== 'polls' && <OpenPollBanner courseId={courseId} />}
     </div>

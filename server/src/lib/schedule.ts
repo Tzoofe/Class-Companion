@@ -88,8 +88,8 @@ export interface AgendaItem {
   end: string | null;
   courseId: string;
   courseName: string;
-  /** 'class' = a weekly slot; otherwise the event kind. */
-  kind: 'class' | Exclude<EventKind, 'cancelled'>;
+  /** 'class' = a weekly slot; 'due' = an assignment deadline; otherwise the event kind. */
+  kind: 'class' | 'due' | Exclude<EventKind, 'cancelled'>;
   title: string;
   place: string;
   link: string;

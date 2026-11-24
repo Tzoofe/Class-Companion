@@ -1,4 +1,5 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
+import { assignmentsRouter } from './routes/assignments.js';
 import { authRouter } from './routes/auth.js';
 import { coursesRouter } from './routes/courses.js';
 import { overviewRouter } from './routes/overview.js';
@@ -25,6 +26,7 @@ export function createApp() {
   app.use('/api', scheduleRouter);
   app.use('/api', overviewRouter);
   app.use('/api', summariesRouter);
+  app.use('/api', assignmentsRouter);
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found' });
