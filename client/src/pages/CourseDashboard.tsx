@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, type CourseDashboard as Dashboard } from '../api';
+import { api, downloadFile, type CourseDashboard as Dashboard } from '../api';
 import { ErrorBox } from '../components/ui';
 
 const LIVE_POLL_MS = 5000;
@@ -95,6 +95,19 @@ export default function CourseDashboard() {
   const { id = '' } = useParams();
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  async function exportFile() {
+    setExporting(true);
+    setError('');
+    try {
+      await downloadFile(`/courses/${id}/export`, 'attendance.xlsx');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -138,12 +151,22 @@ export default function CourseDashboard() {
         </Link>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-bold">{course.name}</h1>
-          <Link
-            to={`/courses/${course.id}/attendance`}
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${data.live ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-          >
-            {data.live ? '● למפגש הפעיל' : 'התחל נוכחות'}
-          </Link>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={exportFile}
+              disabled={exporting}
+              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {exporting ? '…' : 'ייצוא'}
+            </button>
+            <Link
+              to={`/courses/${course.id}/attendance`}
+              className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${data.live ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+            >
+              {data.live ? '● למפגש הפעיל' : 'התחל נוכחות'}
+            </Link>
+          </div>
         </div>
       </div>
 

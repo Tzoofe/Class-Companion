@@ -2,11 +2,13 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { ATTENDANCE_RULES, isPreciseEnoughToStart } from '../../../shared/attendance.js';
 import { announceSessionStarted } from '../lib/push.js';
+import { buildCourseWorkbook } from '../lib/export.js';
 import { parseRosterFile } from '../lib/roster.js';
 import { closeExpiredSessions, toPublicSession, toStudentSession } from '../lib/sessions.js';
 import { readLocation } from '../lib/validate.js';
 import { buildDashboard, buildStudentRows, isSessionActive } from '../lib/stats.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { config } from '../config.js';
 import { Attendance, PRESENT } from '../models/Attendance.js';
 import { Course } from '../models/Course.js';
 import { Session } from '../models/Session.js';
@@ -184,6 +186,44 @@ coursesRouter.get('/:id/sessions', requireRole('lecturer'), async (req, res) => 
     rosterCount: course.roster.length,
     sessions: sessions.map((s) => ({ id: s.id as string, startsAt: s.startsAt, endsAt: s.endsAt, status: s.status, present: presentById.get(s.id) ?? 0 })),
   });
+});
+
+/** Attendance spreadsheet: summary sheet + one sheet per session. Lecturer-only. */
+coursesRouter.get('/:id/export', requireRole('lecturer'), async (req, res) => {
+  const course = await findOwnCourse(String(req.params.id), req.auth!.sub);
+  if (!course) {
+    res.status(404).json({ error: 'Course not found' });
+    return;
+  }
+  await closeExpiredSessions({ courseId: course._id });
+  const [users, sessions] = await Promise.all([
+    User.find({ email: { $in: course.roster.map((r) => r.email) } }, { email: 1 }),
+    Session.find({ courseId: course._id }, { status: 1, startsAt: 1, endsAt: 1 }),
+  ]);
+  const records = await Attendance.find({ sessionId: { $in: sessions.map((s) => s._id) } });
+  const now = new Date();
+  const wb = buildCourseWorkbook({
+    courseName: course.name,
+    roster: course.roster.map((r) => ({ email: r.email, firstName: r.firstName, lastName: r.lastName })),
+    users: users.map((u) => ({ id: u.id as string, email: u.email })),
+    sessions: sessions.map((s) => ({ id: s.id as string, status: s.status, startsAt: s.startsAt, endsAt: s.endsAt })),
+    records: records.map((r) => ({
+      sessionId: String(r.sessionId),
+      email: r.email,
+      present: r.present,
+      source: r.source,
+      checkedInAt: r.checkedInAt,
+      distanceM: r.distanceM,
+      accuracyM: r.accuracyM,
+    })),
+    now,
+    timeZone: config.timeZone,
+  });
+  const date = now.toISOString().slice(0, 10);
+  const name = `נוכחות - ${course.name} - ${date}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="attendance-${date}.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}`);
+  res.send(Buffer.from(await wb.xlsx.writeBuffer()));
 });
 
 function findOwnCourse(id: string, lecturerId: string) {

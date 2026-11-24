@@ -76,6 +76,7 @@ Geolocation on a phone requires HTTPS — see [docs/PHONE_TESTING.md](docs/PHONE
 | POST | `/api/courses/preview` | lecturer | parse a roster file `{ fileName, fileBase64 }` without saving |
 | POST | `/api/courses` | lecturer | create course `{ name, defaultRadiusM, fileName, fileBase64 }` |
 | GET | `/api/courses/:id/dashboard` | lecturer (own course) | counts, average attendance % and per-session history (finished sessions, last 12), live session count, up to 5 students under 70% |
+| GET | `/api/courses/:id/export` | lecturer (own course) | `.xlsx` download: summary sheet (per student: attended, %, last seen) + one sheet per session (present, source, time, distance, accuracy); times in `TIME_ZONE` (default Asia/Jerusalem) |
 | GET | `/api/courses/:id/students` | lecturer (own course) | roster with signup status, attendance count / %, last seen, present in active session |
 | GET | `/api/courses/:id/sessions` | lecturer (own course) | all sessions, newest first, with present counts |
 | GET | `/api/courses/:id/sessions/active` | lecturer (own) / student (on roster) | the active session or `null` |

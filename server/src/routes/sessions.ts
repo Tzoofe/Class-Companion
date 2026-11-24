@@ -63,7 +63,7 @@ const collator = new Intl.Collator('he');
 async function rosterRows(session: SessionDoc, roster: { email: string; firstName: string; lastName: string }[]) {
   const emails = roster.map((r) => r.email.toLowerCase());
   const [records, users] = await Promise.all([
-    Attendance.find({ sessionId: session._id }, { email: 1, present: 1, source: 1, checkedInAt: 1, distanceM: 1 }),
+    Attendance.find({ sessionId: session._id }, { email: 1, present: 1, source: 1, checkedInAt: 1, distanceM: 1, accuracyM: 1 }),
     User.find({ email: { $in: emails } }, { email: 1 }),
   ]);
   const byEmail = new Map(records.map((a) => [a.email, a]));
@@ -82,6 +82,7 @@ async function rosterRows(session: SessionDoc, roster: { email: string; firstNam
         source: a?.present ? a.source : null,
         checkedInAt: a?.present ? a.checkedInAt : null,
         distanceM: a?.present && a.source === 'gps' ? (a.distanceM ?? null) : null,
+        accuracyM: a?.present && a.source === 'gps' ? (a.accuracyM ?? null) : null,
       };
     })
     .sort((a, b) => collator.compare(a.lastName, b.lastName) || collator.compare(a.firstName, b.firstName));

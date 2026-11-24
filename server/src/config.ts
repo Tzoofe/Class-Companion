@@ -22,6 +22,8 @@ export const config = {
     if (!publicKey || !privateKey) return null;
     return { publicKey, privateKey, subject: process.env.VAPID_SUBJECT || 'mailto:noreply@example.com' };
   },
+  /** Times in exported spreadsheets are shown in this time zone. */
+  timeZone: process.env.TIME_ZONE || 'Asia/Jerusalem',
   jwtExpiresIn: '7d',
   minPasswordLength: 6,
 };

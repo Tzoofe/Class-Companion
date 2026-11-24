@@ -10,6 +10,7 @@ function How({ s }: { s: SessionRosterRow }) {
     return (
       <span className="text-xs text-slate-500">
         GPS{s.distanceM !== null && ` · ${Math.round(s.distanceM)} מ׳`}
+        {s.accuracyM !== null && ` (±${Math.round(s.accuracyM)})`}
         {s.checkedInAt && ` · ${timeOf(s.checkedInAt)}`}
       </span>
     );

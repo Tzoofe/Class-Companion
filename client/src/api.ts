@@ -190,6 +190,7 @@ export interface SessionRosterRow {
   source: 'gps' | 'manual' | null;
   checkedInAt: string | null;
   distanceM: number | null;
+  accuracyM: number | null;
 }
 
 export type SessionRoster = SessionStatus & { students: SessionRosterRow[] };
@@ -198,4 +199,32 @@ export interface CourseSessionsList {
   course: { id: string; name: string };
   rosterCount: number;
   sessions: { id: string; startsAt: string; endsAt: string; status: 'active' | 'closed'; present: number }[];
+}
+
+/** Downloads a file from an authenticated endpoint and hands it to the browser as a download. */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const headers = new Headers();
+  const token = tokenStore.get();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, { headers });
+  } catch {
+    throw new ApiError(0, 'אין חיבור לשרת');
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, HEBREW_ERRORS[data.error] ?? 'ההורדה נכשלה, נסו שוב', data);
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  const name = encoded ? decodeURIComponent(encoded) : fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
